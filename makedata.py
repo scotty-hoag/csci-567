@@ -14,10 +14,11 @@ glob_numChampionPlaysPerPlayer = {}
 glob_numChampionPlaysPerPlayerWins = {}
 
 # (set of all player names)
-glob_playerNames = set()
+glob_playerNamesSet = set()
+glob_playerNames = []
 # (set of all champion names)
-glob_championNames = set()
-
+glob_championNamesSet = set()
+glob_championNames = []
 
 glob_rolesBlue =  ['blueTop',        'blueJungle',       'blueMiddle',       'blueADC',      'blueSupport']
 glob_rolesRed  =  ['redTop',         'redJungle',        'redMiddle',        'redADC',       'redSupport' ]
@@ -75,11 +76,13 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
             continue
 
         # Player and champion names are added to SETs, so enforces uniqueness.
+        # After we fill the sets, make sorted lists.
         for role in glob_rolesAll:
-            glob_playerNames.add(row[role])
-
+            glob_playerNamesSet.add(row[role])
+        glob_playerNames = sorted(glob_playerNamesSet)
         for champion in glob_champsAll:
-            glob_championNames.add(row[champion])
+            glob_championNamesSet.add(row[champion])
+        glob_championNames = sorted(glob_championNamesSet)
 
     for role in glob_rolesAll:
         glob_numMatchesInRole[role] = {}
