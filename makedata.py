@@ -166,7 +166,7 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
 
 def WritePlayerData():
     outputString = "Player Name," + \
-        "Games Played,Games Won," + \
+        "Games Played,Games Won,Win Ratio," + \
         "Blue Top Plays,Red Top Plays,Top Plays," + \
         "Blue Top Wins,Red Top Wins,Top Wins," + \
         "Blue Jungle, Red Jungle, Jungle," + \
@@ -184,9 +184,10 @@ def WritePlayerData():
     for playerName, player in glob_players.items():
         if player == None or player.name == "":
             continue
-        outputString += "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format( \
+        playerWinRatio = ((player.gamesWon/player.gamesPlayed) if (player.gamesPlayed > 0) else 0)
+        outputString += "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format( \
             player.name \
-            , player.gamesPlayed, player.gamesWon \
+            , player.gamesPlayed, player.gamesWon, playerWinRatio \
             , player.rolesPlayed[rBlue[0]], player.rolesPlayed[rReds[0]], player.rolesPlayed[rBlue[0]] + player.rolesPlayed[rReds[0]] \
             , player.rolesWon[   rBlue[0]], player.rolesWon[   rReds[0]], player.rolesWon   [rBlue[0]] + player.rolesWon[   rReds[0]] \
             , player.rolesPlayed[rBlue[1]], player.rolesPlayed[rReds[1]], player.rolesPlayed[rBlue[1]] + player.rolesPlayed[rReds[1]] \
@@ -202,4 +203,8 @@ def WritePlayerData():
     file.write(outputString)
     file.close()
 
+def WriteChampionData():
+    pass
+
 WritePlayerData()
+WriteChampionData()
