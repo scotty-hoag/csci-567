@@ -41,12 +41,18 @@ class Player:
     championsPlayed = {}
     championsWon = {}
 
+    vsPlayerPlayed = {}
+    vsPlayerWon = {}
+
     def __init__(self):
         self.rolesPlayed = {}
         self.rolesWon = {}
 
         self.championsPlayed = {}
         self.championsWon = {}
+
+        self.vsPlayerPlayed = {}
+        self.vsPlayerWon = {}
 glob_players = {}
 
 class Champion:
@@ -57,11 +63,18 @@ class Champion:
 
     rolesPlayed = {}
     rolesWon = {}
+    
+    vsChampionPlayed = {}
+    vsChampionWon = {}
 
     def __init__(self):
         self.rolesPlayed = {}
         self.rolesWon = {}
+
+        self.vsChampionPlayed = {}
+        self.vsChampionWon = {}
 glob_champions = {}
+
 
 def IsRowValid(row):
     # For now, skip rows that don't have complete information.
@@ -99,10 +112,15 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
             player.rolesPlayed[role] = 0
             player.rolesWon[role] = 0
 
-        # Record the number of champion plays and wins.
+        # Init the number of champion plays and wins.
         for champ in glob_championNames:
             player.championsPlayed[champ] = 0
             player.championsWon[champ] = 0
+        
+        # Init the number of vs player plays and wins.
+        for vsPlayerName in glob_playerNames:
+            player.vsPlayerPlayed[vsPlayerName] = 0
+            player.vsPlayerWon[vsPlayerName] = 0
     
     # Record the champion role win stats.
     for championName in glob_championNames:
@@ -114,6 +132,11 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
         for role in glob_rolesAll:
             champion.rolesPlayed[role] = 0
             champion.rolesWon[role] = 0
+
+        # Init the number of vs champion plays and wins.
+        for vsChampionName in glob_championNames:
+            champion.vsChampionPlayed[vsChampionName] = 0
+            champion.vsChampionWon[vsChampionName] = 0
 
 with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
     reader = csv.DictReader(csvFile)
@@ -163,6 +186,14 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
             # Inc matches played by the player with the specific Champion.
             player.championsPlayed[championName] += 1
 
+            # For each member of the other team, record +1 vs play.
+            for vsRole in winningTeamRoles:
+                vsPlayerName = row[vsRole]
+                player.vsPlayerPlayed[vsPlayerName] += 1
+            for vsChampionRole in winningTeamChamps:
+                vsChampionName = row[vsChampionRole]
+                champion.vsChampionPlayed[vsChampionName] += 1
+
         for roleIndex in range(len(winningTeamRoles)):
             role = winningTeamRoles[roleIndex]
             playerName = row[role]
@@ -187,6 +218,16 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
             # Inc matches played and won by the player with the specific Champion.
             player.championsPlayed[championName] += 1
             player.championsWon[championName] += 1
+            
+            # For each member of the other team, record +1 vs play and +1 vs win.
+            for vsRole in losingTeamRoles:
+                vsPlayerName = row[vsRole]
+                player.vsPlayerPlayed[vsPlayerName] += 1
+                player.vsPlayerWon[vsPlayerName] += 1
+            for vsChampionRole in losingTeamChamps:
+                vsChampionName = row[vsChampionRole]
+                champion.vsChampionPlayed[vsChampionName] += 1
+                champion.vsChampionWon[vsChampionName] += 1
 
 def WritePlayerData():
     outputString = "Name," + \
@@ -295,6 +336,66 @@ def WritePlayerWinsWithEachChampionData():
     file.write(outputString)
     file.close()
 
-WritePlayerData()
-WriteChampionData()
-WritePlayerWinsWithEachChampionData()
+def WritePlayerVsData():
+    outputString = "Name"
+    for playerName, player in glob_players.items():
+            if player == None or playerName == "":
+                continue
+            outputString += ",{}".format(playerName)
+    outputString += "\n"
+
+    # For each player,
+    #    For each other player,
+    #        win ratio = games won / games played
+    for playerName, player in glob_players.items():
+        if player == None or playerName == "":
+            continue
+        
+        outputString += playerName
+        for vsPlayerName, vsPlayer in glob_players.items():
+            if vsPlayer == None or vsPlayerName == "":
+                continue
+            
+            playerWinRatio = ((player.vsPlayerWon[vsPlayerName]/player.vsPlayerPlayed[vsPlayerName]) if (player.vsPlayerPlayed[vsPlayerName] > 0) else 0)
+
+            outputString += ",{}".format(playerWinRatio)
+        outputString += "\n"
+
+    file = open("feature_data/player_vs_data.csv", 'w+')
+    file.write(outputString)
+    file.close()
+    
+def WriteChampionVsData():
+    outputString = "Name"
+    for championName, champion in glob_champions.items():
+            if champion == None or championName == "":
+                continue
+            outputString += ",{}".format(championName)
+    outputString += "\n"
+
+    # For each champion,
+    #    For each other champion,
+    #        win ratio = games won / games played
+    for championName, champion in glob_champions.items():
+        if champion == None or championName == "":
+            continue
+        
+        outputString += championName
+        for vsChampionName, vsChampion in glob_champions.items():
+            if vsChampion == None or vsChampionName == "":
+                continue
+            
+            championWinRatio = ((champion.vsChampionWon[vsChampionName]/champion.vsChampionPlayed[vsChampionName]) if (champion.vsChampionPlayed[vsChampionName] > 0) else 0)
+
+            outputString += ",{}".format(championWinRatio)
+        outputString += "\n"
+
+    file = open("feature_data/champion_vs_data.csv", 'w+')
+    file.write(outputString)
+    file.close()
+
+#WritePlayerData()
+#WriteChampionData()
+#WritePlayerWinsWithEachChampionData()
+WritePlayerVsData()
+WriteChampionVsData()

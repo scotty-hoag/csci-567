@@ -9,12 +9,12 @@ Features defined in the paper are calculated and placed in the following places:
 
 3.
 
-4.
+4. vsPlayer: Individual player win ratios in player_vs_data.csv.
 
 5. championRole_i,j: champion_data.csv, "Win Ratio"
 
 6. 
 
-7. 
+7. vsChampion: Individual champion win ratios in champion_vs_data.csv.
 
 8. 
