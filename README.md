@@ -5,7 +5,7 @@ Features defined in the paper are calculated and placed in the following places:
 
 1. playerRole_i,j: player_data.csv, "Win Ratio"
 
-2. 
+2. playerChampion_i,j: player_wins_with_each_champion_data.csv
 
 3.
 

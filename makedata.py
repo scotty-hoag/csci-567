@@ -266,5 +266,35 @@ def WriteChampionData():
     file.write(outputString)
     file.close()
 
+def WritePlayerWinsWithEachChampionData():
+    outputString = "Player Name"
+    for championName, champion in glob_champions.items():
+            if champion == None or champion.name == "":
+                continue
+            outputString += ",{}".format(championName)
+    outputString += "\n"
+
+    # For each player,
+    #    For each champion,
+    #        win ratio = games won / games played
+    for playerName, player in glob_players.items():
+        if player == None or player.name == "":
+            continue
+        
+        outputString += playerName
+        for championName, champion in glob_champions.items():
+            if champion == None or champion.name == "":
+                continue
+            
+            playerWinRatio = ((player.championsWon[championName]/player.championsPlayed[championName]) if (player.championsPlayed[championName] > 0) else 0)
+
+            outputString += ",{}".format(playerWinRatio)
+        outputString += "\n"
+
+    file = open("feature_data/player_wins_with_each_champion_data.csv", 'w+')
+    file.write(outputString)
+    file.close()
+
 WritePlayerData()
 WriteChampionData()
+WritePlayerWinsWithEachChampionData()
