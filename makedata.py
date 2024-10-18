@@ -19,14 +19,21 @@ glob_playerNames = []
 # (set of all champion names)
 glob_championNamesSet = set()
 glob_championNames = []
+# (set of all team names)
+glob_teamNamesSet = set()
+glob_teamNames = []
+
 
 glob_rolesBlue =  ['blueTop',        'blueJungle',       'blueMiddle',       'blueADC',      'blueSupport']
 glob_rolesRed  =  ['redTop',         'redJungle',        'redMiddle',        'redADC',       'redSupport' ]
 glob_champsBlue = ['blueTopChamp',   'blueJungleChamp',  'blueMiddleChamp',  'blueADCChamp', 'blueSupportChamp']
 glob_champsRed  = ['redTopChamp',    'redJungleChamp',   'redMiddleChamp',   'redADCChamp',  'redSupportChamp']
+glob_teamTagsBlue = ['blueTeamTag']
+glob_teamTagsRed  = ['redTeamTag']
 
 glob_rolesAll  = glob_rolesBlue  + glob_rolesRed
 glob_champsAll = glob_champsBlue + glob_champsRed
+glob_teamTagsAll = glob_teamTagsBlue + glob_teamTagsRed
 
 
 class Player:
@@ -75,6 +82,22 @@ class Champion:
         self.vsChampionWon = {}
 glob_champions = {}
 
+class Team:
+    name = ""
+
+    gamesPlayed = 0
+    gamesWon = 0
+    
+    gamesPlayedBlue = 0
+    gamesWonBlue = 0
+
+    gamesPlayedRed = 0
+    gamesWonRed = 0
+    
+    def __init__(self):
+        pass
+glob_teams = {}
+
 
 def IsRowValid(row):
     # For now, skip rows that don't have complete information.
@@ -88,7 +111,7 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
         if not IsRowValid(row):
             continue
 
-        # Player and champion names are added to SETs, so enforces uniqueness.
+        # Player, champion, and team names are added to SETs, enforcing uniqueness.
         # After we fill the sets, make sorted lists.
         for role in glob_rolesAll:
             glob_playerNamesSet.add(row[role])
@@ -96,6 +119,10 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
         for champion in glob_champsAll:
             glob_championNamesSet.add(row[champion])
         glob_championNames = sorted(glob_championNamesSet)
+        for teamTag in glob_teamTagsAll:
+            glob_teamNamesSet.add(row[teamTag])
+        glob_teamNames = sorted(glob_teamNamesSet)
+        
 
     for role in glob_rolesAll:
         glob_numMatchesInRole[role] = {}
@@ -138,6 +165,13 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
             champion.vsChampionPlayed[vsChampionName] = 0
             champion.vsChampionWon[vsChampionName] = 0
 
+    # Record the team stats.
+    for teamName in glob_teamNames:
+        team = Team()
+        team.name = teamName
+        glob_teams[teamName] = team
+
+
 with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
     reader = csv.DictReader(csvFile)
     for row in reader:
@@ -153,18 +187,39 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
         winningTeamChamps = []
         losingTeamChamps = []
         
+        teamNameBlue = row[glob_teamTagsBlue[0]]
+        teamNameRed = row[glob_teamTagsRed[0]]
+
+        teamBlue = glob_teams[teamNameBlue]
+        teamRed = glob_teams[teamNameRed]
+
+        teamBlue.gamesPlayed += 1
+        teamRed.gamesPlayed += 1
+
         if winBlue == 1:
             winningTeamRoles = glob_rolesBlue
             losingTeamRoles = glob_rolesRed
 
             winningTeamChamps = glob_champsBlue
             losingTeamChamps = glob_champsRed
+
+            teamBlue.gamesPlayedBlue += 1
+            teamBlue.gamesWonBlue += 1
+            teamBlue.gamesWon += 1
+
+            teamRed.gamesPlayedRed += 1
         else:
             winningTeamRoles = glob_rolesRed
             losingTeamRoles = glob_rolesBlue
 
             winningTeamChamps = glob_champsRed
             losingTeamChamps = glob_champsBlue
+
+            teamRed.gamesPlayedRed += 1
+            teamRed.gamesWonRed += 1
+            teamRed.gamesWon += 1
+
+            teamBlue.gamesPlayedBlue += 1
         
         for roleIndex in range(len(losingTeamRoles)):
             role = losingTeamRoles[roleIndex]
@@ -394,8 +449,34 @@ def WriteChampionVsData():
     file.write(outputString)
     file.close()
 
-#WritePlayerData()
-#WriteChampionData()
-#WritePlayerWinsWithEachChampionData()
+
+def WriteTeamData():
+    outputString = "teamTag" + \
+        ",Games Played,Games Won,Win Ratio" + \
+        ",Games Played Blue,Games Won Blue,Win Ratio Blue" + \
+        ",Games Played Red,Games Won Red,Win Ratio Red" + \
+        "\n"
+
+    for teamName, team in glob_teams.items():
+        if team == None or teamName == "":
+            continue
+
+        winRatio = ((team.gamesWon/team.gamesPlayed) if (team.gamesPlayed > 0) else 0)
+        winRatioBlue = ((team.gamesWonBlue/team.gamesPlayedBlue) if (team.gamesPlayedBlue > 0) else 0)
+        winRatioRed = ((team.gamesWonRed/team.gamesPlayedRed) if (team.gamesPlayedRed > 0) else 0)
+        outputString += "{},{},{},{},{},{},{},{},{},{},\n".format(team.name \
+            , team.gamesPlayed,     team.gamesWon,     winRatio     \
+            , team.gamesPlayedBlue, team.gamesWonBlue, winRatioBlue \
+            , team.gamesPlayedRed,  team.gamesWonRed,  winRatioRed  \
+        )
+
+    file = open("feature_data/team_data.csv", 'w+')
+    file.write(outputString)
+    file.close()
+
+WritePlayerData()
+WriteChampionData()
+WritePlayerWinsWithEachChampionData()
 WritePlayerVsData()
 WriteChampionVsData()
+WriteTeamData()

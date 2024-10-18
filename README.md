@@ -3,18 +3,22 @@ Repository for the USC CSCI-567 semester group project.
 
 Features defined in the paper are calculated and placed in the following places:
 
+
 1. playerRole_i,j: player_data.csv, "Win Ratio"
 
 2. playerChampion_i,j: player_wins_with_each_champion_data.csv
 
 3.
 
-4. vsPlayer: Individual player win ratios in player_vs_data.csv.
+4. ! vsPlayer: Individual player win ratios in player_vs_data.csv.
 
 5. championRole_i,j: champion_data.csv, "Win Ratio"
 
 6. 
 
-7. vsChampion: Individual champion win ratios in champion_vs_data.csv.
+7. ! vsChampion: Individual champion win ratios in champion_vs_data.csv.
 
-8. 
+8. teamColor_j: team_data.csv, Win Ratio Blue, Win Ratio Red
+
+
+!: These contain the individual player vs player ratios. The sums must be computed by adding these ratio values for the given players in a match.
