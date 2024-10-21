@@ -104,7 +104,38 @@ def IsRowValid(row):
     bValid = not (row["blueTeamTag"] == "" or row["redTeamTag"] == "")
     return bValid
 
+# Make fixed match data.
+# Remove invalid data rows.
+# Attach row indicies.
 with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
+    reader = csv.DictReader(csvFile)
+    rowNumber = 0
+    outputString = ""
+    for row in reader:
+        # For now, skip rows that don't have complete information.
+        if (rowNumber == 0):
+            outputString += "index,"
+            for key in list(row.keys()):
+                outputString += "{},".format(key)
+            outputString += "\n"
+
+        if not IsRowValid(row):
+            continue
+
+        outputString += "{},".format(rowNumber)
+        rowNumber += 1
+        for value in list(row.values()):
+            outputString += "{},".format(value)
+        outputString += "\n"
+
+    file = open("feature_data/match_info.csv", 'w+')
+    file.write(outputString)
+    file.close()
+
+
+
+
+with open('feature_data/match_info.csv', newline='', encoding='utf-8') as csvFile:
     reader = csv.DictReader(csvFile)
     for row in reader:
         # For now, skip rows that don't have complete information.
@@ -172,7 +203,7 @@ with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
         glob_teams[teamName] = team
 
 
-with open('lol_data/matchinfo.csv', newline='', encoding='utf-8') as csvFile:
+with open('feature_data/match_info.csv', newline='', encoding='utf-8') as csvFile:
     reader = csv.DictReader(csvFile)
     for row in reader:
         # For now, skip rows that don't have complete information.
@@ -391,6 +422,32 @@ def WritePlayerWinsWithEachChampionData():
     file.write(outputString)
     file.close()
 
+
+def WriteTeamData():
+    outputString = "teamTag" + \
+        ",Games Played,Games Won,Win Ratio" + \
+        ",Games Played Blue,Games Won Blue,Win Ratio Blue" + \
+        ",Games Played Red,Games Won Red,Win Ratio Red" + \
+        "\n"
+
+    for teamName, team in glob_teams.items():
+        if team == None or teamName == "":
+            continue
+
+        winRatio = ((team.gamesWon/team.gamesPlayed) if (team.gamesPlayed > 0) else 0)
+        winRatioBlue = ((team.gamesWonBlue/team.gamesPlayedBlue) if (team.gamesPlayedBlue > 0) else 0)
+        winRatioRed = ((team.gamesWonRed/team.gamesPlayedRed) if (team.gamesPlayedRed > 0) else 0)
+        outputString += "{},{},{},{},{},{},{},{},{},{},\n".format(team.name \
+            , team.gamesPlayed,     team.gamesWon,     winRatio     \
+            , team.gamesPlayedBlue, team.gamesWonBlue, winRatioBlue \
+            , team.gamesPlayedRed,  team.gamesWonRed,  winRatioRed  \
+        )
+
+    file = open("feature_data/team_data.csv", 'w+')
+    file.write(outputString)
+    file.close()
+
+
 def WritePlayerVsData():
     outputString = "Name"
     for playerName, player in glob_players.items():
@@ -449,34 +506,95 @@ def WriteChampionVsData():
     file.write(outputString)
     file.close()
 
+def WriteMatchVSAndCoopData():
+    csvFile = open('feature_data/match_info.csv', newline='', encoding='utf-8')
+    reader = csv.DictReader(csvFile)
+    
+    outputString = "index,"
+    for name in glob_rolesAll:
+        outputString += "{},{},{},".format(name, name+"Vs", name+"Coop")
+    for name in glob_champsAll:
+        outputString += "{},{},{},".format(name, name+"Vs", name+"Coop")
+    outputString += "\n"
 
-def WriteTeamData():
-    outputString = "teamTag" + \
-        ",Games Played,Games Won,Win Ratio" + \
-        ",Games Played Blue,Games Won Blue,Win Ratio Blue" + \
-        ",Games Played Red,Games Won Red,Win Ratio Red" + \
-        "\n"
-
-    for teamName, team in glob_teams.items():
-        if team == None or teamName == "":
+    for row in reader:
+        # For now, skip rows that don't have complete information.
+        if not IsRowValid(row):
             continue
 
-        winRatio = ((team.gamesWon/team.gamesPlayed) if (team.gamesPlayed > 0) else 0)
-        winRatioBlue = ((team.gamesWonBlue/team.gamesPlayedBlue) if (team.gamesPlayedBlue > 0) else 0)
-        winRatioRed = ((team.gamesWonRed/team.gamesPlayedRed) if (team.gamesPlayedRed > 0) else 0)
-        outputString += "{},{},{},{},{},{},{},{},{},{},\n".format(team.name \
-            , team.gamesPlayed,     team.gamesWon,     winRatio     \
-            , team.gamesPlayedBlue, team.gamesWonBlue, winRatioBlue \
-            , team.gamesPlayedRed,  team.gamesWonRed,  winRatioRed  \
-        )
+        outputString += "{},".format(row['index'])
 
-    file = open("feature_data/team_data.csv", 'w+')
+        # Blue Players
+        for rollName in glob_rolesBlue:
+            playerName = row[rollName]
+            player = glob_players[playerName]
+            statVs = 0
+            statCoop = 0
+
+            for vsRollName in glob_rolesRed:
+                vsPlayerName = row[vsRollName]
+
+                statVs += ((player.vsPlayerWon[vsPlayerName]/player.vsPlayerPlayed[vsPlayerName]) if (player.vsPlayerPlayed[vsPlayerName] > 0) else 0)
+
+            outputString += "{},{},{},".format(playerName, statVs, statCoop)
+        
+        # Red Players
+        for rollName in glob_rolesRed:
+            playerName = row[rollName]
+            player = glob_players[playerName]
+            statVs = 0
+            statCoop = 0
+
+            for vsRollName in glob_rolesBlue:
+                vsPlayerName = row[vsRollName]
+
+                statVs += ((player.vsPlayerWon[vsPlayerName]/player.vsPlayerPlayed[vsPlayerName]) if (player.vsPlayerPlayed[vsPlayerName] > 0) else 0)
+
+            outputString += "{},{},{},".format(playerName, statVs, statCoop)
+
+        # Blue Champions
+        for rollName in glob_champsBlue:
+            championName = row[rollName]
+            champion = glob_champions[championName]
+            statVs = 0
+            statCoop = 0
+
+            for vsRollName in glob_champsRed:
+                vsChampionName = row[vsRollName]
+
+                statVs += ((champion.vsChampionWon[vsChampionName]/champion.vsChampionPlayed[vsChampionName]) if (champion.vsChampionPlayed[vsChampionName] > 0) else 0)
+
+            outputString += "{},{},{},".format(championName, statVs, statCoop)
+        
+        # Red Players
+        for rollName in glob_champsRed:
+            championName = row[rollName]
+            champion = glob_champions[championName]
+            statVs = 0
+            statCoop = 0
+
+            for vsRollName in glob_champsBlue:
+                vsChampionName = row[vsRollName]
+
+                statVs += ((champion.vsChampionWon[vsChampionName]/champion.vsChampionPlayed[vsChampionName]) if (champion.vsChampionPlayed[vsChampionName] > 0) else 0)
+
+            outputString += "{},{},{},".format(championName, statVs, statCoop)
+            
+        outputString += "\n"
+
+    file = open("feature_data/match_vs_coop_data.csv", 'w+')
     file.write(outputString)
     file.close()
 
-WritePlayerData()
-WriteChampionData()
-WritePlayerWinsWithEachChampionData()
-WritePlayerVsData()
-WriteChampionVsData()
-WriteTeamData()
+
+
+
+            
+
+#WritePlayerData()
+#WriteChampionData()
+#WritePlayerWinsWithEachChampionData()
+#WriteTeamData()
+#WritePlayerVsData()
+#WriteChampionVsData()
+WriteMatchVSAndCoopData()
