@@ -51,6 +51,9 @@ class Player:
     vsPlayerPlayed = {}
     vsPlayerWon = {}
 
+    coopPlayerPlayed = {}
+    coopPlayerWon = {}
+
     def __init__(self):
         self.rolesPlayed = {}
         self.rolesWon = {}
@@ -60,6 +63,9 @@ class Player:
 
         self.vsPlayerPlayed = {}
         self.vsPlayerWon = {}
+
+        self.coopPlayerPlayed = {}
+        self.coopPlayerWon = {}
 glob_players = {}
 
 class Champion:
@@ -74,12 +80,18 @@ class Champion:
     vsChampionPlayed = {}
     vsChampionWon = {}
 
+    coopChampionPlayed = {}
+    coopChampionWon = {}
+
     def __init__(self):
         self.rolesPlayed = {}
         self.rolesWon = {}
 
         self.vsChampionPlayed = {}
         self.vsChampionWon = {}
+
+        self.coopChampionPlayed = {}
+        self.coopChampionWon = {}
 glob_champions = {}
 
 class Team:
@@ -179,6 +191,11 @@ with open('feature_data/match_info.csv', newline='', encoding='utf-8') as csvFil
         for vsPlayerName in glob_playerNames:
             player.vsPlayerPlayed[vsPlayerName] = 0
             player.vsPlayerWon[vsPlayerName] = 0
+        
+        # Init the number of coop player plays and wins.
+        for vsPlayerName in glob_playerNames:
+            player.coopPlayerPlayed[vsPlayerName] = 0
+            player.coopPlayerWon[vsPlayerName] = 0
     
     # Record the champion role win stats.
     for championName in glob_championNames:
@@ -195,6 +212,11 @@ with open('feature_data/match_info.csv', newline='', encoding='utf-8') as csvFil
         for vsChampionName in glob_championNames:
             champion.vsChampionPlayed[vsChampionName] = 0
             champion.vsChampionWon[vsChampionName] = 0
+
+        # Init the number of coop champion plays and wins.
+        for vsChampionName in glob_championNames:
+            champion.coopChampionPlayed[vsChampionName] = 0
+            champion.coopChampionWon[vsChampionName] = 0
 
     # Record the team stats.
     for teamName in glob_teamNames:
@@ -280,6 +302,20 @@ with open('feature_data/match_info.csv', newline='', encoding='utf-8') as csvFil
                 vsChampionName = row[vsChampionRole]
                 champion.vsChampionPlayed[vsChampionName] += 1
 
+            # For each member of our own team, record +1 coop play.
+            for coopRoleIndex in range(len(losingTeamRoles)):
+                if coopRoleIndex == roleIndex:
+                    continue
+                coopPlayerRoll = losingTeamRoles[coopRoleIndex]
+                coopPlayerName = row[coopPlayerRoll]
+                player.coopPlayerPlayed[coopPlayerName] += 1
+            for coopRoleIndex in range(len(losingTeamChamps)):
+                if coopRoleIndex == roleIndex:
+                    continue
+                coopChampionRoll = losingTeamChamps[coopRoleIndex]
+                coopChampionName = row[coopChampionRoll]
+                champion.coopChampionPlayed[coopChampionName] += 1
+
         for roleIndex in range(len(winningTeamRoles)):
             role = winningTeamRoles[roleIndex]
             playerName = row[role]
@@ -314,6 +350,22 @@ with open('feature_data/match_info.csv', newline='', encoding='utf-8') as csvFil
                 vsChampionName = row[vsChampionRole]
                 champion.vsChampionPlayed[vsChampionName] += 1
                 champion.vsChampionWon[vsChampionName] += 1
+            
+            # For each member of our own team, record +1 coop play and +1 coop win.
+            for coopRoleIndex in range(len(winningTeamRoles)):
+                if coopRoleIndex == roleIndex:
+                    continue
+                coopPlayerRoll = winningTeamRoles[coopRoleIndex]
+                coopPlayerName = row[coopPlayerRoll]
+                player.coopPlayerPlayed[coopPlayerName] += 1
+                player.coopPlayerWon[coopPlayerName] += 1
+            for coopRoleIndex in range(len(winningTeamChamps)):
+                if coopRoleIndex == roleIndex:
+                    continue
+                coopChampionRoll = winningTeamChamps[coopRoleIndex]
+                coopChampionName = row[coopChampionRoll]
+                champion.coopChampionPlayed[coopChampionName] += 1
+                champion.coopChampionWon[coopChampionName] += 1
 
 def WritePlayerData():
     outputString = "Name," + \
@@ -510,11 +562,19 @@ def WriteMatchVSAndCoopData():
     csvFile = open('feature_data/match_info.csv', newline='', encoding='utf-8')
     reader = csv.DictReader(csvFile)
     
+    bAddExtraStats = True
+
     outputString = "index,"
+    outputStringExtra = ""
     for name in glob_rolesAll:
-        outputString += "{},{},{},".format(name, name+"Vs", name+"Coop")
+        outputStringExtra += "{},{},{},".format(name, name+"Vs", name+"Coop")
     for name in glob_champsAll:
-        outputString += "{},{},{},".format(name, name+"Vs", name+"Coop")
+        outputStringExtra += "{},{},{},".format(name, name+"Vs", name+"Coop")
+    outputString += "sumVsBluePlayers,sumVsRedPlayers,sumVsBlueChampions,sumVsRedChampions,"
+    outputString += "sumCoopBluePlayers,sumCoopRedPlayers,sumCoopBlueChampions,sumCoopRedChampions,"
+    if bAddExtraStats:
+        outputString += outputStringExtra
+        outputStringExtra = ""
     outputString += "\n"
 
     for row in reader:
@@ -525,61 +585,102 @@ def WriteMatchVSAndCoopData():
         outputString += "{},".format(row['index'])
 
         # Blue Players
+        sumVsBluePlayers = 0
+        sumCoopBluePlayers = 0
         for rollName in glob_rolesBlue:
             playerName = row[rollName]
             player = glob_players[playerName]
             statVs = 0
             statCoop = 0
 
+            # VS
             for vsRollName in glob_rolesRed:
                 vsPlayerName = row[vsRollName]
-
                 statVs += ((player.vsPlayerWon[vsPlayerName]/player.vsPlayerPlayed[vsPlayerName]) if (player.vsPlayerPlayed[vsPlayerName] > 0) else 0)
+            sumVsBluePlayers += statVs
 
-            outputString += "{},{},{},".format(playerName, statVs, statCoop)
+            # Coop
+            for coopRollName in glob_rolesBlue:
+                coopPlayerName = row[coopRollName]
+                statCoop += ((player.coopPlayerWon[coopPlayerName]/player.coopPlayerPlayed[coopPlayerName]) if (player.coopPlayerPlayed[coopPlayerName] > 0) else 0)
+            sumCoopBluePlayers += statCoop
+            
+            outputStringExtra += "{},{},{},".format(playerName, statVs, statCoop)
         
         # Red Players
+        sumVsRedPlayers = 0
+        sumCoopRedPlayers = 0
         for rollName in glob_rolesRed:
             playerName = row[rollName]
             player = glob_players[playerName]
             statVs = 0
             statCoop = 0
 
+            # VS
             for vsRollName in glob_rolesBlue:
                 vsPlayerName = row[vsRollName]
-
                 statVs += ((player.vsPlayerWon[vsPlayerName]/player.vsPlayerPlayed[vsPlayerName]) if (player.vsPlayerPlayed[vsPlayerName] > 0) else 0)
+            sumVsRedPlayers += statVs
 
-            outputString += "{},{},{},".format(playerName, statVs, statCoop)
+            # Coop
+            for coopRollName in glob_rolesRed:
+                coopPlayerName = row[coopRollName]
+                statCoop += ((player.coopPlayerWon[coopPlayerName]/player.coopPlayerPlayed[coopPlayerName]) if (player.coopPlayerPlayed[coopPlayerName] > 0) else 0)
+            sumCoopRedPlayers += statCoop
+            
+            outputStringExtra += "{},{},{},".format(playerName, statVs, statCoop)
 
         # Blue Champions
+        sumVsBlueChampions = 0
+        sumCoopBlueChampions = 0
         for rollName in glob_champsBlue:
             championName = row[rollName]
             champion = glob_champions[championName]
             statVs = 0
             statCoop = 0
 
+            # VS
             for vsRollName in glob_champsRed:
                 vsChampionName = row[vsRollName]
-
                 statVs += ((champion.vsChampionWon[vsChampionName]/champion.vsChampionPlayed[vsChampionName]) if (champion.vsChampionPlayed[vsChampionName] > 0) else 0)
+            sumVsBlueChampions += statVs
 
-            outputString += "{},{},{},".format(championName, statVs, statCoop)
+            # Coop
+            for coopRollName in glob_champsBlue:
+                coopChampionName = row[coopRollName]
+                statCoop += ((champion.coopChampionWon[coopChampionName]/champion.coopChampionPlayed[coopChampionName]) if (champion.coopChampionPlayed[coopChampionName] > 0) else 0)
+            sumCoopBlueChampions += statCoop
+            
+            outputStringExtra += "{},{},{},".format(championName, statVs, statCoop)
         
-        # Red Players
+        # Red Champions
+        sumVsRedChampions = 0
+        sumCoopRedChampions = 0
         for rollName in glob_champsRed:
             championName = row[rollName]
             champion = glob_champions[championName]
             statVs = 0
             statCoop = 0
 
+            # VS
             for vsRollName in glob_champsBlue:
                 vsChampionName = row[vsRollName]
-
                 statVs += ((champion.vsChampionWon[vsChampionName]/champion.vsChampionPlayed[vsChampionName]) if (champion.vsChampionPlayed[vsChampionName] > 0) else 0)
+            sumVsRedChampions += statVs
 
-            outputString += "{},{},{},".format(championName, statVs, statCoop)
+            # Coop
+            for coopRollName in glob_champsRed:
+                coopChampionName = row[coopRollName]
+                statCoop += ((champion.coopChampionWon[coopChampionName]/champion.coopChampionPlayed[coopChampionName]) if (champion.coopChampionPlayed[coopChampionName] > 0) else 0)
+            sumCoopRedChampions += statCoop
             
+            outputStringExtra += "{},{},{},".format(championName, statVs, statCoop)
+
+        outputString += "{},{},{},{},".format(sumVsBluePlayers, sumVsRedPlayers, sumVsBlueChampions, sumVsRedChampions)
+        outputString += "{},{},{},{},".format(sumCoopBluePlayers, sumCoopRedPlayers, sumCoopBlueChampions, sumCoopRedChampions)
+        if bAddExtraStats:
+            outputString += outputStringExtra
+            outputStringExtra = ""
         outputString += "\n"
 
     file = open("feature_data/match_vs_coop_data.csv", 'w+')
@@ -591,10 +692,10 @@ def WriteMatchVSAndCoopData():
 
             
 
-#WritePlayerData()
-#WriteChampionData()
-#WritePlayerWinsWithEachChampionData()
-#WriteTeamData()
-#WritePlayerVsData()
-#WriteChampionVsData()
+WritePlayerData()
+WriteChampionData()
+WritePlayerWinsWithEachChampionData()
+WriteTeamData()
+WritePlayerVsData()
+WriteChampionVsData()
 WriteMatchVSAndCoopData()
