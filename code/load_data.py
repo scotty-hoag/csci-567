@@ -59,12 +59,50 @@ WIN_RATE_PLAYER_ROLE_REPLACE_COLS = {
     "redSupport": "rsPlayerRole"
 }
 
+DROPCOLS = [
+    'blueTeamTag', 
+    'redTeamTag', 
+    'blueTop', 
+    'blueTopChamp',
+    'blueJungle', 
+    'blueJungleChamp', 
+    'blueMiddle', 
+    'blueMiddleChamp',
+    'blueADC', 
+    'blueADCChamp', 
+    'blueSupport', 
+    'blueSupportChamp', 
+    'redTop',
+    'redTopChamp', 
+    'redJungle', 
+    'redJungleChamp', 
+    'redMiddle',
+    'redMiddleChamp', 
+    'redADC', 
+    'redADCChamp', 
+    'redSupport',
+    'redSupportChamp'
+]
+      
 TEAM_COLOR = ["Blue", "Red"]
 TEAM_ROLE = ["Top", "Jungle", "Middle", "ADC", "Support"]
 
-def load_data():
+def load_data(bPerformZNormalization=True, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
     """
+        Loads data from the feature CSV files and morphs the relevant fields into a dataframe for training use.
+
+        Input:
+            bPerformZNormalization - bool: If True (default) perform z-score normalization on all columns (except bResult) before
+                returning the data frame.
+            bGenerateOutputFile - bool: If True, generates a csv file representing the contents of the training data. Generated 
+                CSV files will be located in the /feature_data directory named 'featureInput' or 'featureInput_zScoreNormalized'.
+                If bIncludeChampionRole_Feature is set to False, then the files will be appended with '_noChampionRole'.
+            bIncludeChampionRole_Feature - bool: If True, include the championRole features described in feature 5 of the research
+                paper. Note that this feature is not used by the research paper as part of the training data.
+
         Return data:
+            dataframe - A pandas dataframe whose columns are described in Table II (pg 178) of the Research Paper, in addition
+                to the label column: bResult, which equals 1 if the blue team has won the match.
 
     """
     #Note: We assume that the folder structure will be consistent throughout the development process.
@@ -77,100 +115,129 @@ def load_data():
     file_player_vs_data = "player_vs_data.csv"
     file_player_wins_with_each_champion_data = "player_wins_with_each_champion_data.csv"
     file_team_data = "team_data.csv"
+    file_match_vs_coop = "match_vs_coop_data.csv"
 
     match_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"lol_data\{file_match_data}")
-    dir_data_champion = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"feature_data\{file_data_champion}")
-    dir_player_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"feature_data\{file_player_data}")
+    dir_data_champion = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_data_champion}")
+    dir_player_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_player_data}")
     dir_player_wins_with_each_champion_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 
-                                                           f"feature_data\{file_player_wins_with_each_champion_data}")
-    dir_player_vs_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"feature_data\{file_player_vs_data}")
+                                                           f"{dir_feature_data}\{file_player_wins_with_each_champion_data}")
+    dir_player_vs_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_player_vs_data}")
+    dir_match_vs_coop = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_match_vs_coop}")
+    dir_team_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_team_data}")
     
     #Load the initial data, then start replacing the fields with the engineered data.
     match_data = pd.read_csv(match_data_path, usecols=INPUT_COLS_MATCHDATA)
     champion_data = pd.read_csv(dir_data_champion)
+    match_vs_coop_data = pd.read_csv(dir_match_vs_coop)
     player_data = pd.read_csv(dir_player_data)
     player_wr_champion_data = pd.read_csv(dir_player_wins_with_each_champion_data)
     player_vs_data = pd.read_csv(dir_player_vs_data)
+    team_data = pd.read_csv(dir_team_data, index_col=False)
 
     #Remove extra white space before processing
     player_data.columns = player_data.columns.str.strip()
-        
+    champion_data.columns = champion_data.columns.str.strip()
+
+    #Fill in 0s for NaN fields
+    team_data = team_data.fillna(0)
+
     modified_match_df = match_data
 
-    #Implementation of Feature 1: playerRole
+    #Throw out the entries that don't have player data. The rows that do not have an entry for 'blueTop' also do not have
+    #entries for the other roles. In addition, do the same for entries missing a 'blueTeamTag'
+    modified_match_df = modified_match_df.dropna(subset=['blueTeamTag', 'blueTop'], ignore_index=True) 
 
-    #Compute the win ratios for each role and add the field to the dataframe.
+    #Implementation of Feature 1: playerRole
     for teamColor in TEAM_COLOR:
         for role in TEAM_ROLE:
             player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {role}"]).fillna(0)
             player_data_map = player_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
-            modified_match_df[f"wr{teamColor}{role}"] = modified_match_df[f"{teamColor.lower()}{role}"].map(player_data_map).fillna(0)
+            
+            labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
+            modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}"].map(player_data_map)
     
-    #Implementation of Feature 2: playerChampion
+    #Implementation of Feature 2: playerChampion        
     player_wins_df = player_wr_champion_data.melt(
         id_vars=['Player Name'],
         var_name='Champion',
         value_name='WinRate'
     )
 
-    for field, newField in WIN_RATE_PLAYER_ROLE_REPLACE_COLS.items():
+    for field, newField in WIN_RATE_CHAMPION_REPLACE_COLS.items():
+        playerField = field.replace("Champ", "")
         role_merge = modified_match_df.merge(
             player_wins_df,
-            left_on=[field, f"{field}Champ"],
+            left_on=[playerField, field],
             right_on=['Player Name', 'Champion'],
             how='left'            
         )
 
-        modified_match_df[newField] = role_merge['WinRate']
-
-    #Drop columns at end of processing.
-    # modified_match_df.drop(WIN_RATE_PLAYER_ROLE_REPLACE_COLS.keys(), axis=1, inplace=True)    
-
-    #Implementation of Feature 3
-    #TODO: Implement after csv file has been generated.
+        modified_match_df[newField] = role_merge['WinRate'].fillna(0)
+        
+    #Implementation of Feature 3: coopPlayer_blue/red
+    modified_match_df['bCoopPlayer'] = match_vs_coop_data['sumCoopBluePlayers']
+    modified_match_df['rCoopPlayer'] = match_vs_coop_data['sumCoopRedPlayers']
         
     #Implementation of Feature 4: vsPlayer
-    player_winRatio_vs_df = player_vs_data.melt(
-        id_vars=['Name'],
-        var_name='Opponent',
-        value_name='WinRate'
-    )
+    modified_match_df['vsPlayer'] = match_vs_coop_data['sumVsBluePlayers']
 
-    #Example implementation    
-    match_long_df = match_data.melt(
-        id_vars=['blueTop'], 
-        value_vars=['redTop','redJungle','redMiddle'],                                     
-        var_name='role', 
-        value_name='opponent'
-    )
-    
-    # for role in WIN_RATE_PLAYER_ROLE_REPLACE_COLS:
-    #     blue_player = match_data[role]
-        
-    #     opponent_merge = modified_match_df.merge(
-    #         player_vs_data,
-    #         left_on=[role],
-    #         right_on=['Name']
-    #     )
+    #Implementation of Feature 5: championRole
+    if bIncludeChampionRole_Feature:
+        for teamColor in TEAM_COLOR:
+            for role in TEAM_ROLE:
+                champion_data[f"wr{teamColor}{role}"] = (champion_data[f"{role} Wins"] / champion_data[f"{role} Plays"]).fillna(0)
+                champion_data_map = champion_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
 
-    merged_df = match_long_df.merge(
-        player_winRatio_vs_df,
-        left_on=['blueTop', 'opponent'],
-        right_on=['Name', 'Opponent'],
-        how='left'
-    )
-
-    strTest = "test"    
-
-
-    #Implementation of Feature 5
-        
+                # labelName = WIN_RATE_CHAMPION_REPLACE_COLS[f"{teamColor.lower()}{role}Champ"]
+                labelName = f"{teamColor[0].lower()}{role[0].lower()}ChampionRole"
+                modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}Champ"].map(champion_data_map)
+                
     #Implementation of Feature 6
+    modified_match_df['bCoopChampion'] = match_vs_coop_data['sumCoopBlueChampions'].fillna(0)
+    modified_match_df['rCoopChampion'] = match_vs_coop_data['sumCoopRedChampions'].fillna(0)
         
     #Implementation of Feature 7
+    modified_match_df['vsChampion'] = match_vs_coop_data['sumVsBlueChampions'].fillna(0)
         
     #Implementation of Feature 8
-                
+    team_data['teamTag'] = team_data['teamTag'].astype(str)
+
+    #Concept with respect to blueTeam only
+    team_data_blue_map = team_data.set_index('teamTag')['Win Ratio Blue'].to_dict()
+    modified_match_df['bTeamColor'] = modified_match_df['blueTeamTag'].map(team_data_blue_map)
+
+    team_data_red_map = team_data.set_index('teamTag')['Win Ratio Red'].to_dict()
+    modified_match_df['rTeamColor'] = modified_match_df['redTeamTag'].map(team_data_red_map)  
+
+    #Drop all unnecessary cols from modified_match_df.
+    modified_match_df.drop(columns=DROPCOLS, inplace=True)
+
+    outputFileName = "featureInput.csv" if bIncludeChampionRole_Feature else "featureInput_noChampionRole.csv"
+    
+    if bPerformZNormalization:
+        outputFileName = "featureInput_zScoreNormalized.csv" if bIncludeChampionRole_Feature else "featureInput_zScoreNormalized_noChampionRole.csv"
+        perform_Z_score(modified_match_df)
+    
+    if bGenerateOutputFile:
+        # Export file for reference purposes
+        dir_file_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{outputFileName}")
+        modified_match_df.to_csv(dir_file_output, index=False)
+
+    return modified_match_df
+
+def perform_Z_score(match_df):
+    """
+        Perform Z-Score normalization on the passed dataframe.
+    """
+    list_colNames = list(match_df.columns)
+    
+    for item in list_colNames:
+        if item == "bResult":
+            continue
+
+        match_df[item] = (match_df[item] - match_df[item].mean()) / match_df[item].std()
+
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
     load_data()

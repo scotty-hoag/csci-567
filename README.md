@@ -27,3 +27,9 @@ Features defined in the paper are calculated and placed in the following places:
     Individual champion win ratios in champion_vs_data.csv.
 
 8. teamColor_j: team_data.csv, Win Ratio Blue, Win Ratio Red
+
+II. Use guide: load_data.py
+
+The load_data function can be used standalone to generate the input CSV files, or as part of the import process for training a model. If using it to generate the CSV files, these generated files will be located in the feature_data directory. 
+
+See load_data documenation for additional details.
