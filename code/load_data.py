@@ -87,7 +87,7 @@ DROPCOLS = [
 TEAM_COLOR = ["Blue", "Red"]
 TEAM_ROLE = ["Top", "Jungle", "Middle", "ADC", "Support"]
 
-def load_data(bPerformZNormalization=True, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
+def load_data(bIncludeChampionRole_Feature=False):
     """
         Loads data from the feature CSV files and morphs the relevant fields into a dataframe for training use.
 
@@ -213,18 +213,20 @@ def load_data(bPerformZNormalization=True, bGenerateOutputFile=False, bIncludeCh
     #Drop all unnecessary cols from modified_match_df.
     modified_match_df.drop(columns=DROPCOLS, inplace=True)
 
-    outputFileName = "featureInput.csv" if bIncludeChampionRole_Feature else "featureInput_noChampionRole.csv"
-    
-    if bPerformZNormalization:
-        outputFileName = "featureInput_zScoreNormalized.csv" if bIncludeChampionRole_Feature else "featureInput_zScoreNormalized_noChampionRole.csv"
-        perform_Z_score(modified_match_df)
-    
-    if bGenerateOutputFile:
-        # Export file for reference purposes
-        dir_file_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{outputFileName}")
-        modified_match_df.to_csv(dir_file_output, index=False)
-
     return modified_match_df
+
+    # outputFileName = "featureInput.csv" if bIncludeChampionRole_Feature else "featureInput_noChampionRole.csv"
+    
+    # if bPerformZNormalization:
+    #     outputFileName = "featureInput_zScoreNormalized.csv" if bIncludeChampionRole_Feature else "featureInput_zScoreNormalized_noChampionRole.csv"
+    #     perform_Z_score(modified_match_df)
+    
+    # if bGenerateOutputFile:
+    #     # Export file for reference purposes
+    #     dir_file_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{outputFileName}")
+    #     modified_match_df.to_csv(dir_file_output, index=False)
+
+    # return modified_match_df
 
 def perform_Z_score(match_df):
     """

@@ -35,17 +35,16 @@ class xgbStack:
     
     #Import the data, either by processing all the feature csv files along with the matchdata.csv file or 
     #inputting a precompiled input file.
-    def import_data(self, bPerformZNormalization=True, bGenerateOutputFile=False, 
-                    bIncludeChampionRole_Feature=False):
-        df_input = load_data.load_data(bPerformZNormalization=bPerformZNormalization, 
-                                       bGenerateOutputFile=bGenerateOutputFile, 
-                                       bIncludeChampionRole_Feature=bIncludeChampionRole_Feature)
+    def import_data(self, bIncludeChampionRole_Feature=False):
+        df_input = load_data.load_data(bIncludeChampionRole_Feature=bIncludeChampionRole_Feature)
         
         return df_input
     
     #Split the data into training and test sets.
-    def split_data(self, dataFrame):
+    def split_data(self, dataFrame, bGenerateOutputFiles=False):
         """
+            Splits the inputted dataFrame into a training and test dataset.
+
             Input: Dataframe containing all the labels referenced in the research (optionally
              including feature 5), along with the bResult label.
         """
@@ -56,8 +55,8 @@ class xgbStack:
             Execute both the naive bayes model and NN concurrently.
 
         """
-        with ThreadPoolExecutor() as executor:
-            pass
+        # with ThreadPoolExecutor() as executor:
+        #     pass
 
             # future_1 = executor.submit(train_and_predict, model_1, X_train, y_train, X_test)
             # future_2 = executor.submit(train_and_predict, model_2, X_train, y_train, X_test)
@@ -78,8 +77,7 @@ class xgbStack:
         pass
         
     def train_model(self):
-
-        self.import_data() 
+        matchData_df = self.import_data()
         self.split_data()
         self.parallelExecute_LearningModels()
         self.execute_metaModel()
@@ -89,4 +87,5 @@ class xgbStack:
 
 if __name__ == "__main__":
     modelInstance = xgbStack()
-    entry = modelInstance.import_data()
+    match_df = modelInstance.import_data()
+    modelInstance.split_data(match_df)
