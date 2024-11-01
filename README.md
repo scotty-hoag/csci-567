@@ -28,6 +28,25 @@ Features defined in the paper are calculated and placed in the following places:
 
 8. teamColor_j: team_data.csv, Win Ratio Blue, Win Ratio Red
 
+
+To re-process data into training and testing sets, run the "makedata.bat" script. Or, manually run the following commands to generate data with the dataset split into approx 90% training data and 10% testing data.
+
+python3 makedata.py -makeinfo 0.90
+python3 makedata.py -train
+python3 makedata.py -test
+
+
+Example output of makedata.bat:
+
+C:\...\csci-567>makedata.bat
+Made new SPLIT feature training and test data.
+Num lines: 7620, Num Lines Valid: 7582, Num Lines Removed: 38, Lines Training: 6817 (0.899), Lines Test: 765 (0.101)
+Creating new feature data: Training Set.
+Done.
+Creating new feature data: Test Set.
+Done.
+
+
 II. Use guide: load_data.py
 
 The load_data function can be used standalone to generate the input CSV files, or as part of the import process for training a model. If using it to generate the CSV files, these generated files will be located in the feature_data directory. 
