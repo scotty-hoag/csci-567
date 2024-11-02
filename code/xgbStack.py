@@ -93,5 +93,3 @@ if __name__ == "__main__":
 
     x_train = modelInstance.perform_z_score(x_train)
     x_test = modelInstance.perform_z_score(x_test)
-
-    testStr = "test"
