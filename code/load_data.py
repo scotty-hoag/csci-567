@@ -87,13 +87,13 @@ DROPCOLS = [
 TEAM_COLOR = ["Blue", "Red"]
 TEAM_ROLE = ["Top", "Jungle", "Middle", "ADC", "Support"]
 
-def load_data(bIncludeChampionRole_Feature=False):
+def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
     """
         Loads data from the feature CSV files and morphs the relevant fields into a dataframe for training use.
 
         Input:
-            bPerformZNormalization - bool: If True (default) perform z-score normalization on all columns (except bResult) before
-                returning the data frame.
+            bIsTrainingSet - bool: If True, imports the data from the training folder into a dataframe. If False, use the 
+                test folder as the import source.
             bGenerateOutputFile - bool: If True, generates a csv file representing the contents of the training data. Generated 
                 CSV files will be located in the /feature_data directory named 'featureInput' or 'featureInput_zScoreNormalized'.
                 If bIncludeChampionRole_Feature is set to False, then the files will be appended with '_noChampionRole'.
@@ -107,8 +107,9 @@ def load_data(bIncludeChampionRole_Feature=False):
     """
     #Note: We assume that the folder structure will be consistent throughout the development process.
     dir_feature_data = "feature_data"
+    setType = "train" if bIsTrainingSet else "test"
 
-    file_match_data = "matchinfo.csv"
+    file_match_data = "match_info.csv"
     file_data_champion = "champion_data.csv"
     file_champion_vs_data = "champion_vs_data.csv"
     file_player_data = "player_data.csv"
@@ -117,14 +118,14 @@ def load_data(bIncludeChampionRole_Feature=False):
     file_team_data = "team_data.csv"
     file_match_vs_coop = "match_vs_coop_data.csv"
 
-    match_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"lol_data\{file_match_data}")
-    dir_data_champion = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_data_champion}")
-    dir_player_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_player_data}")
+    match_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{file_match_data}")
+    dir_data_champion = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{file_data_champion}")
+    dir_player_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{file_player_data}")
     dir_player_wins_with_each_champion_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 
-                                                           f"{dir_feature_data}\{file_player_wins_with_each_champion_data}")
-    dir_player_vs_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_player_vs_data}")
-    dir_match_vs_coop = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_match_vs_coop}")
-    dir_team_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{file_team_data}")
+                                                           f"{dir_feature_data}\{setType}\{file_player_wins_with_each_champion_data}")
+    dir_player_vs_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{file_player_vs_data}")
+    dir_match_vs_coop = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{file_match_vs_coop}")
+    dir_team_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{file_team_data}")
     
     #Load the initial data, then start replacing the fields with the engineered data.
     match_data = pd.read_csv(match_data_path, usecols=INPUT_COLS_MATCHDATA)
@@ -151,7 +152,10 @@ def load_data(bIncludeChampionRole_Feature=False):
     #Implementation of Feature 1: playerRole
     for teamColor in TEAM_COLOR:
         for role in TEAM_ROLE:
-            player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {role}"]).fillna(0)
+            #Append 'Plays' if the role is 'Top' to handle the column discrepancy.
+            playLabel = "Top Plays" if role == "Top" else role
+
+            player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {playLabel}"]).fillna(0)
             player_data_map = player_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
             
             labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
@@ -186,7 +190,10 @@ def load_data(bIncludeChampionRole_Feature=False):
     if bIncludeChampionRole_Feature:
         for teamColor in TEAM_COLOR:
             for role in TEAM_ROLE:
-                champion_data[f"wr{teamColor}{role}"] = (champion_data[f"{role} Wins"] / champion_data[f"{role} Plays"]).fillna(0)
+                #Append 'Plays' if the role is 'Top' to handle the column discrepancy.
+                playLabel = "Top Plays" if role == "Top" else role
+
+                champion_data[f"wr{teamColor}{role}"] = (champion_data[f"{role} Wins"] / champion_data[playLabel]).fillna(0)
                 champion_data_map = champion_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
 
                 # labelName = WIN_RATE_CHAMPION_REPLACE_COLS[f"{teamColor.lower()}{role}Champ"]
@@ -213,33 +220,13 @@ def load_data(bIncludeChampionRole_Feature=False):
     #Drop all unnecessary cols from modified_match_df.
     modified_match_df.drop(columns=DROPCOLS, inplace=True)
 
+    if bGenerateOutputFile:
+         outputFileName = "featureInput.csv"
+         dir_file_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{outputFileName}")
+         modified_match_df.to_csv(dir_file_output, index=False)
+
     return modified_match_df
-
-    # outputFileName = "featureInput.csv" if bIncludeChampionRole_Feature else "featureInput_noChampionRole.csv"
-    
-    # if bPerformZNormalization:
-    #     outputFileName = "featureInput_zScoreNormalized.csv" if bIncludeChampionRole_Feature else "featureInput_zScoreNormalized_noChampionRole.csv"
-    #     perform_Z_score(modified_match_df)
-    
-    # if bGenerateOutputFile:
-    #     # Export file for reference purposes
-    #     dir_file_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{outputFileName}")
-    #     modified_match_df.to_csv(dir_file_output, index=False)
-
-    # return modified_match_df
-
-def perform_Z_score(match_df):
-    """
-        Perform Z-Score normalization on the passed dataframe.
-    """
-    list_colNames = list(match_df.columns)
-    
-    for item in list_colNames:
-        if item == "bResult":
-            continue
-
-        match_df[item] = (match_df[item] - match_df[item].mean()) / match_df[item].std()
 
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
-    load_data()
+    load_data_from_csv(False)

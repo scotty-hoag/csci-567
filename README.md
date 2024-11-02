@@ -46,11 +46,3 @@ Done.
 Creating new feature data: Test Set.
 Done.
 
-
-II. Use guide: load_data.py
-
-The load_data function can be used standalone to generate the input CSV files, or as part of the import process for training a model. If using it to generate the CSV files, these generated files will be located in the feature_data directory. 
-
-Note that Z-Score Normalization is not done in the load_data function, as it is recommended to perform that operation after the data training and test dataset split.
-
-See load_data documenation for additional details.

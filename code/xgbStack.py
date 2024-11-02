@@ -1,21 +1,16 @@
 import time
-
 import numpy as np
 import pandas as pd
 
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.ensemble import StackingClassifier #For XGB implementation
-
-from concurrent.futures import ThreadPoolExecutor
+from scipy.stats import zscore
 
 import load_data
 
 class xgbStack:
-
     def __init__(self, hpNaiveBayes=None, hpNeuralNetwork=None, hpXgb=None):
         """
             Input:
@@ -35,20 +30,23 @@ class xgbStack:
     
     #Import the data, either by processing all the feature csv files along with the matchdata.csv file or 
     #inputting a precompiled input file.
-    def import_data(self, bIncludeChampionRole_Feature=False):
-        df_input = load_data.load_data(bIncludeChampionRole_Feature=bIncludeChampionRole_Feature)
+    def import_data(self, bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
+        df_input = load_data.load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=bGenerateOutputFile, 
+                                                bIncludeChampionRole_Feature=bIncludeChampionRole_Feature)
         
         return df_input
     
-    #Split the data into training and test sets.
-    def split_data(self, dataFrame, bGenerateOutputFiles=False):
+    def extract_labels(self, x_input):
         """
-            Splits the inputted dataFrame into a training and test dataset.
+            Extracts the bResult column from the dataframe and returns another dataframe with those labels.            
+        """
+        y_data = x_input['bResult']
+        x_data = x_input.drop(columns='bResult')
 
-            Input: Dataframe containing all the labels referenced in the research (optionally
-             including feature 5), along with the bResult label.
-        """
-        pass
+        return x_data, y_data
+    
+    def perform_z_score(self, x_input):
+        return x_input.apply(zscore)
 
     def parallelExecute_LearningModels(self):
         """
@@ -87,5 +85,13 @@ class xgbStack:
 
 if __name__ == "__main__":
     modelInstance = xgbStack()
-    match_df = modelInstance.import_data()
-    modelInstance.split_data(match_df)
+    match_df_training = modelInstance.import_data(True, bGenerateOutputFile=False)
+    match_df_test = modelInstance.import_data(False, bGenerateOutputFile=False)
+    
+    x_train, y_train = modelInstance.extract_labels(match_df_training)
+    x_test, y_test = modelInstance.extract_labels(match_df_test)
+
+    x_train = modelInstance.perform_z_score(x_train)
+    x_test = modelInstance.perform_z_score(x_test)
+
+    testStr = "test"
