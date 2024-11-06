@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import os
 
+from sklearn.model_selection import train_test_split
+
 INPUT_COLS_MATCHDATA = [
     "blueTeamTag",
     "redTeamTag",
@@ -141,81 +143,89 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
     champion_data.columns = champion_data.columns.str.strip()
 
     #Fill in 0s for NaN fields
-    team_data = team_data.fillna(0)
+    team_data = team_data.fillna(0.5)
 
     modified_match_df = match_data
 
     #Throw out the entries that don't have player data. The rows that do not have an entry for 'blueTop' also do not have
     #entries for the other roles. In addition, do the same for entries missing a 'blueTeamTag'
-    modified_match_df = modified_match_df.dropna(subset=['blueTeamTag', 'blueTop'], ignore_index=True) 
+    # modified_match_df = modified_match_df.dropna(subset=['blueTeamTag', 'blueTop'], ignore_index=True) 
 
     #Implementation of Feature 1: playerRole
-    for teamColor in TEAM_COLOR:
-        for role in TEAM_ROLE:
-            #Append 'Plays' if the role is 'Top' to handle the column discrepancy.
-            playLabel = "Top Plays" if role == "Top" else role
-
-            player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {playLabel}"]).fillna(0)
-            player_data_map = player_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
+    # for teamColor in TEAM_COLOR:
+    #     for role in TEAM_ROLE:
+    #         #Append 'Plays' if the role is 'Top'
+    #         playLabel = "Top Plays" if role == "Top" else role
             
-            labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
-            modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}"].map(player_data_map)
+    #         #Commented-out code is the older implementation, for reference
+    #         # player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {playLabel}"]).fillna(0.5)
+    #         player_data[f"wr{teamColor}{role}"] = ((player_data[f"Blue {role} Wins"] + player_data[f"Red {role} Wins"]) 
+    #                                                / (player_data[f"Blue {playLabel}"] + player_data[f"Red {playLabel}"])).fillna(0.5)
+            
+            
+    #         player_data_map = player_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
+            
+    #         labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
+    #         modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}"].map(player_data_map)
     
-    #Implementation of Feature 2: playerChampion        
-    player_wins_df = player_wr_champion_data.melt(
-        id_vars=['Player Name'],
-        var_name='Champion',
-        value_name='WinRate'
-    )
+    # #Implementation of Feature 2: playerChampion        
+    # player_wins_df = player_wr_champion_data.melt(
+    #     id_vars=['Player Name'],
+    #     var_name='Champion',
+    #     value_name='WinRate'
+    # )
 
-    for field, newField in WIN_RATE_CHAMPION_REPLACE_COLS.items():
-        playerField = field.replace("Champ", "")
-        role_merge = modified_match_df.merge(
-            player_wins_df,
-            left_on=[playerField, field],
-            right_on=['Player Name', 'Champion'],
-            how='left'            
-        )
+    # for field, newField in WIN_RATE_CHAMPION_REPLACE_COLS.items():
+    #     playerField = field.replace("Champ", "")
+    #     role_merge = modified_match_df.merge(
+    #         player_wins_df,
+    #         left_on=[playerField, field],
+    #         right_on=['Player Name', 'Champion'],
+    #         how='left'            
+    #     )
 
-        modified_match_df[newField] = role_merge['WinRate'].fillna(0)
+    #     modified_match_df[newField] = role_merge['WinRate'].fillna(0.5)
         
-    #Implementation of Feature 3: coopPlayer_blue/red
+    # #Implementation of Feature 3: coopPlayer_blue/red
     modified_match_df['bCoopPlayer'] = match_vs_coop_data['sumCoopBluePlayers']
     modified_match_df['rCoopPlayer'] = match_vs_coop_data['sumCoopRedPlayers']
         
-    #Implementation of Feature 4: vsPlayer
-    modified_match_df['vsPlayer'] = match_vs_coop_data['sumVsBluePlayers']
+    # #Implementation of Feature 4: vsPlayer
+    # modified_match_df['vsPlayer'] = match_vs_coop_data['sumVsBluePlayers']
 
     #Implementation of Feature 5: championRole
-    if bIncludeChampionRole_Feature:
-        for teamColor in TEAM_COLOR:
-            for role in TEAM_ROLE:
-                #Append 'Plays' if the role is 'Top' to handle the column discrepancy.
-                playLabel = "Top Plays" if role == "Top" else role
+    # if bIncludeChampionRole_Feature:
+    #     for teamColor in TEAM_COLOR:
+    #         for role in TEAM_ROLE:
+    #             #Append 'Plays' if the role is 'Top' to handle the column discrepancy.
+    #             playLabel = "Top Plays" if role == "Top" else role
 
-                champion_data[f"wr{teamColor}{role}"] = (champion_data[f"{role} Wins"] / champion_data[playLabel]).fillna(0)
-                champion_data_map = champion_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
-
-                # labelName = WIN_RATE_CHAMPION_REPLACE_COLS[f"{teamColor.lower()}{role}Champ"]
-                labelName = f"{teamColor[0].lower()}{role[0].lower()}ChampionRole"
-                modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}Champ"].map(champion_data_map)
+    #             # champion_data[f"wr{teamColor}{role}"] = (champion_data[f"{role} Wins"] / champion_data[playLabel]).fillna(0)
+    #             champion_data[f"wr{teamColor}{role}"] = ((champion_data[f"Blue {role} Wins"] + champion_data[f"Red {role} Wins"]) 
+    #                                                / (champion_data[f"Blue {playLabel}"] + champion_data[f"Red {playLabel}"])).fillna(0.5)
                 
-    #Implementation of Feature 6
-    modified_match_df['bCoopChampion'] = match_vs_coop_data['sumCoopBlueChampions'].fillna(0)
-    modified_match_df['rCoopChampion'] = match_vs_coop_data['sumCoopRedChampions'].fillna(0)
-        
-    #Implementation of Feature 7
-    modified_match_df['vsChampion'] = match_vs_coop_data['sumVsBlueChampions'].fillna(0)
-        
-    #Implementation of Feature 8
-    team_data['teamTag'] = team_data['teamTag'].astype(str)
+    #             champion_data_map = champion_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
 
-    #Concept with respect to blueTeam only
-    team_data_blue_map = team_data.set_index('teamTag')['Win Ratio Blue'].to_dict()
-    modified_match_df['bTeamColor'] = modified_match_df['blueTeamTag'].map(team_data_blue_map)
+    #             # labelName = WIN_RATE_CHAMPION_REPLACE_COLS[f"{teamColor.lower()}{role}Champ"]
+    #             labelName = f"{teamColor[0].lower()}{role[0].lower()}ChampionRole"
+    #             modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}Champ"].map(champion_data_map)
+                
+    # #Implementation of Feature 6
+    modified_match_df['bCoopChampion'] = match_vs_coop_data['sumCoopBlueChampions'].fillna(0.5)
+    modified_match_df['rCoopChampion'] = match_vs_coop_data['sumCoopRedChampions'].fillna(0.5)
+        
+    # #Implementation of Feature 7
+    # modified_match_df['vsChampion'] = match_vs_coop_data['sumVsBlueChampions'].fillna(0.5)
+        
+    # #Implementation of Feature 8
+    # team_data['teamTag'] = team_data['teamTag'].astype(str)
 
-    team_data_red_map = team_data.set_index('teamTag')['Win Ratio Red'].to_dict()
-    modified_match_df['rTeamColor'] = modified_match_df['redTeamTag'].map(team_data_red_map)  
+    # #Concept with respect to blueTeam only
+    # team_data_blue_map = team_data.set_index('teamTag')['Win Ratio Blue'].to_dict()
+    # modified_match_df['bTeamColor'] = modified_match_df['blueTeamTag'].map(team_data_blue_map)
+
+    # team_data_red_map = team_data.set_index('teamTag')['Win Ratio Red'].to_dict()
+    # modified_match_df['rTeamColor'] = modified_match_df['redTeamTag'].map(team_data_red_map)  
 
     #Drop all unnecessary cols from modified_match_df.
     modified_match_df.drop(columns=DROPCOLS, inplace=True)
@@ -227,6 +237,18 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
 
     return modified_match_df
 
+def load_matchdata_into_df(dirMatchData):
+    match_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"feature_data\\{dirMatchData}\\match_info.csv")
+    match_data = pd.read_csv(match_data_path, usecols=INPUT_COLS_MATCHDATA)
+
+    #Extract the label from the match_data dataframe
+    full_df = match_data.drop(columns='bResult')
+    y_data_full_df = match_data['bResult']
+
+    x_train, x_test, y_train, y_test = train_test_split(full_df, y_data_full_df, test_size=0.9, random_state=42)
+    pass
+
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
+    # load_matchdata_into_df("original")
     load_data_from_csv(False)
