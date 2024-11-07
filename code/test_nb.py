@@ -9,12 +9,27 @@ from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import learning_curve
+from sklearn.model_selection import learning_curve, cross_val_score
 
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 gnb = GaussianNB()
+
+def predict_shuffled_y(x_train, y_train, y_test, y_data_full_df):
+    y_shuffled = y_data_full_df.sample(frac=1, random_state=42).reset_index(drop=True)
+    y_train_shuffled = y_shuffled[y_train.index]
+    y_test_shuffled = y_shuffled[y_test.index]
+
+    gnb.fit(x_train, y_train_shuffled)
+    y_pred_shuffled = gnb.predict(x_test)
+
+    shuffled_accuracy = accuracy_score(y_test_shuffled, y_pred_shuffled)
+    print(f"Accuracy on shuffled labels: {shuffled_accuracy:.2f}")
+
+def perform_cross_validation(model, x_full_df, y_full_df):
+    scores = cross_val_score(model, x_full_df, y_full_df, cv=10)
+    print("Cross-validation scores:", scores)
 
 if __name__ == "__main__":
     modelInstance = xgbStack.xgbStack()
@@ -24,7 +39,7 @@ if __name__ == "__main__":
     # x_train, y_train = modelInstance.extract_labels(match_df_training)
     # x_test, y_test = modelInstance.extract_labels(match_df_test)
 
-    match_df_train, match_df_test, y_train, y_test = load_data.load_matchdata_into_df("original")
+    match_df_train, match_df_test, y_train, y_test, x_data_full_df, y_data_full_df = load_data.load_matchdata_into_df("original")
     
     x_train = modelInstance.perform_z_score(match_df_train)
     x_test = modelInstance.perform_z_score(match_df_test)
@@ -37,11 +52,15 @@ if __name__ == "__main__":
     accuracy = accuracy_score(y_test, y_pred)
     conf_matrix = confusion_matrix(y_test, y_pred)
     class_report = classification_report(y_test, y_pred)
-
-    train_sizes, train_scores, test_scores = learning_curve(gnb, x_train, y_train)
-
-    # Print the results
+    
+    #Print the results
     print("Accuracy:", accuracy)
     print("Confusion Matrix:\n", conf_matrix)
     print("Classification Report:\n", class_report)
+
+    predict_shuffled_y(x_train, y_train, y_test, y_data_full_df)
+    perform_cross_validation(gnb, x_data_full_df, y_data_full_df)
+
+    # train_sizes, train_scores, test_scores = learning_curve(gnb, x_train, y_train)
+
 

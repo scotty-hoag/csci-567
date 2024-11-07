@@ -251,13 +251,17 @@ def load_matchdata_into_df(dirMatchData):
     x_train_player_data = generate_playerData_df(x_train)
     x_test_player_data = generate_playerData_df(x_test)
 
+    x_train_player_vs_data = generate_playerData_df(x_train)
+
     x_train = process_feature1(x_train, x_train_player_data)
     x_test = process_feature1(x_test, x_test_player_data)
     
     x_train.drop(columns=DROPCOLS, inplace=True)
     x_test.drop(columns=DROPCOLS, inplace=True)
 
-    return x_train, x_test, y_train, y_test 
+    x_combined = pd.concat([x_train, x_test])
+
+    return x_train, x_test, y_train, y_test, x_combined, y_data_full_df
 
 def generate_playerData_df(df_split_dataset):
     role_columns = []
@@ -298,6 +302,10 @@ def generate_playerData_df(df_split_dataset):
         player_counts_vectorized[f"{role}_Win_Ratio"] = player_counts_vectorized[f"{role}_Win_Ratio"].fillna(0.5)
 
     return player_counts_vectorized
+
+def generate_player_vs_df(df_split_dataset):
+    df_team_1 = df_split_dataset
+    pass
 
 def process_feature1(x_dataset, df_player_data):
     for teamColor in TEAM_COLOR:
