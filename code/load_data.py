@@ -8,6 +8,7 @@ INPUT_COLS_MATCHDATA = [
     "blueTeamTag",
     "redTeamTag",
     "bResult",
+    "rResult", #For experimental purposes only. Remove after final implementation
     "blueTop",
     "blueTopChamp",
     "blueJungle",
@@ -152,21 +153,21 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
     # modified_match_df = modified_match_df.dropna(subset=['blueTeamTag', 'blueTop'], ignore_index=True) 
 
     #Implementation of Feature 1: playerRole
-    # for teamColor in TEAM_COLOR:
-    #     for role in TEAM_ROLE:
-    #         #Append 'Plays' if the role is 'Top'
-    #         playLabel = "Top Plays" if role == "Top" else role
+    for teamColor in TEAM_COLOR:
+        for role in TEAM_ROLE:
+            #Append 'Plays' if the role is 'Top'
+            playLabel = "Top Plays" if role == "Top" else role
             
-    #         #Commented-out code is the older implementation, for reference
-    #         # player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {playLabel}"]).fillna(0.5)
-    #         player_data[f"wr{teamColor}{role}"] = ((player_data[f"Blue {role} Wins"] + player_data[f"Red {role} Wins"]) 
-    #                                                / (player_data[f"Blue {playLabel}"] + player_data[f"Red {playLabel}"])).fillna(0.5)
+            #Commented-out code is the older implementation, for reference
+            # player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {playLabel}"]).fillna(0.5)
+            player_data[f"wr{teamColor}{role}"] = ((player_data[f"Blue {role} Wins"] + player_data[f"Red {role} Wins"]) 
+                                                   / (player_data[f"Blue {playLabel}"] + player_data[f"Red {playLabel}"])).fillna(0.5)
             
             
-    #         player_data_map = player_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
+            player_data_map = player_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
             
-    #         labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
-    #         modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}"].map(player_data_map)
+            labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
+            modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}"].map(player_data_map)
     
     # #Implementation of Feature 2: playerChampion        
     # player_wins_df = player_wr_champion_data.melt(
@@ -187,8 +188,8 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
     #     modified_match_df[newField] = role_merge['WinRate'].fillna(0.5)
         
     # #Implementation of Feature 3: coopPlayer_blue/red
-    modified_match_df['bCoopPlayer'] = match_vs_coop_data['sumCoopBluePlayers']
-    modified_match_df['rCoopPlayer'] = match_vs_coop_data['sumCoopRedPlayers']
+    # modified_match_df['bCoopPlayer'] = match_vs_coop_data['sumCoopBluePlayers']
+    # modified_match_df['rCoopPlayer'] = match_vs_coop_data['sumCoopRedPlayers']
         
     # #Implementation of Feature 4: vsPlayer
     # modified_match_df['vsPlayer'] = match_vs_coop_data['sumVsBluePlayers']
@@ -245,10 +246,70 @@ def load_matchdata_into_df(dirMatchData):
     full_df = match_data.drop(columns='bResult')
     y_data_full_df = match_data['bResult']
 
-    x_train, x_test, y_train, y_test = train_test_split(full_df, y_data_full_df, test_size=0.9, random_state=42)
-    pass
+    x_train, x_test, y_train, y_test = train_test_split(full_df, y_data_full_df, test_size=0.1, random_state=42)
+
+    x_train_player_data = generate_playerData_df(x_train)
+    x_test_player_data = generate_playerData_df(x_test)
+
+    x_train = process_feature1(x_train, x_train_player_data)
+    x_test = process_feature1(x_test, x_test_player_data)
+    
+    x_train.drop(columns=DROPCOLS, inplace=True)
+    x_test.drop(columns=DROPCOLS, inplace=True)
+
+    return x_train, x_test, y_train, y_test 
+
+def generate_playerData_df(df_split_dataset):
+    role_columns = []
+    for team in TEAM_COLOR:
+        for role in TEAM_ROLE:
+            role_columns.append(f"{team.lower()}{role}")
+
+    players_df = df_split_dataset.melt(value_vars=role_columns, value_name='Player', var_name='Role') 
+    player_counts_vectorized = players_df['Player'].value_counts().reset_index()
+    player_counts_vectorized.columns = ['Player', 'Plays']
+
+    #Total wins
+    blue_wins = df_split_dataset[df_split_dataset['rResult'] == 0][role_columns[:5]].melt(value_name='Player').value_counts().reset_index(name='Win_Count').fillna(0)
+    red_wins = df_split_dataset[df_split_dataset['rResult'] == 1][role_columns[5:]].melt(value_name='Player').value_counts().reset_index(name='Win_Count').fillna(0)
+    win_counts_vectorized = pd.concat([blue_wins, red_wins]).groupby('Player').sum().reset_index()
+    win_counts_vectorized.drop(columns='variable', inplace=True)
+    player_counts_vectorized["Win_Count"] = win_counts_vectorized["Win_Count"]
+    player_counts_vectorized["Win_Count"] = player_counts_vectorized["Win_Count"].fillna(0)
+
+    #Create player_data dataframe.
+    for role in TEAM_ROLE:
+        num_plays = df_split_dataset[[f"blue{role}", f"red{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"{role}_Plays")
+        num_plays = num_plays.groupby('Player').sum().reset_index()
+        num_plays.drop(columns='variable', inplace=True)
+        
+        blue_wins = df_split_dataset[df_split_dataset['rResult'] == 0][[f"blue{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"{role}_Win_Count").fillna(0)
+        red_wins = df_split_dataset[df_split_dataset['rResult'] == 1][[f"red{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"{role}_Win_Count").fillna(0)
+        
+        win_count_vectorized = pd.concat([blue_wins, red_wins]).groupby('Player').sum().reset_index()
+        win_count_vectorized.drop(columns='variable', inplace=True)
+        
+        merge_df = num_plays.merge(win_count_vectorized, on='Player', how='left').fillna(0)
+        merge_df[f"{role}_Win_Ratio"] = ((merge_df[f"{role}_Win_Count"]) / merge_df[f"{role}_Plays"].astype(float)).fillna(0.5)
+
+        player_counts_vectorized = player_counts_vectorized.merge(merge_df, on='Player', how='left')
+        player_counts_vectorized[f"{role}_Win_Count"] = player_counts_vectorized[f"{role}_Win_Count"].fillna(0)
+        player_counts_vectorized[f"{role}_Plays"] = player_counts_vectorized[f"{role}_Plays"].fillna(0)
+        player_counts_vectorized[f"{role}_Win_Ratio"] = player_counts_vectorized[f"{role}_Win_Ratio"].fillna(0.5)
+
+    return player_counts_vectorized
+
+def process_feature1(x_dataset, df_player_data):
+    for teamColor in TEAM_COLOR:
+        for role in TEAM_ROLE:            
+            player_data_map = df_player_data.set_index('Player')[f"{role}_Win_Ratio"].to_dict()
+            
+            labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
+            x_dataset[labelName] = x_dataset[f"{teamColor.lower()}{role}"].map(player_data_map)
+
+    return x_dataset
 
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
-    # load_matchdata_into_df("original")
-    load_data_from_csv(False)
+    load_matchdata_into_df("original")
+    # load_data_from_csv(False)
