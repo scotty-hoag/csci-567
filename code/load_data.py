@@ -54,7 +54,7 @@ WIN_RATE_PLAYER_ROLE_REPLACE_COLS = {
     "blueSupport": "bsPlayerRole",
     "redTop": "rtPlayerRole",
     "redJungle": "rjPlayerRole",
-    "redMiddle": "rnPlayerRole",
+    "redMiddle": "rmPlayerRole",
     "redADC": "raPlayerRole",
     "redSupport": "rsPlayerRole"
 }
