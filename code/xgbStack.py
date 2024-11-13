@@ -8,6 +8,11 @@ from sklearn.metrics import accuracy_score
 from sklearn.ensemble import StackingClassifier #For XGB implementation
 from scipy.stats import zscore
 
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
 import load_data
 
 class xgbStack:
@@ -44,27 +49,6 @@ class xgbStack:
         x_data = x_input.drop(columns='bResult')
 
         return x_data, y_data
-    
-    def perform_z_score(self, x_input):
-        return x_input.apply(zscore)
-
-    def parallelExecute_LearningModels(self):
-        """
-            Execute both the naive bayes model and NN concurrently.
-
-        """
-        # with ThreadPoolExecutor() as executor:
-        #     pass
-
-            # future_1 = executor.submit(train_and_predict, model_1, X_train, y_train, X_test)
-            # future_2 = executor.submit(train_and_predict, model_2, X_train, y_train, X_test)
-        
-            # Retrieve the predictions
-            # predictions_1 = future_1.result()
-            # predictions_2 = future_2.result()
-        
-
-        #Return a tuple containing the generated dataframe predictions for each base model.
 
         
     def execute_metaModel(self, tuple_df_baseModelPredictions):
@@ -75,21 +59,36 @@ class xgbStack:
         pass
         
     def train_model(self):
-        matchData_df = self.import_data()
-        self.split_data()
-        self.parallelExecute_LearningModels()
-        self.execute_metaModel()
+        match_df_training = self.import_data(True, bGenerateOutputFile=False)
+        match_df_test = self.import_data(False, bGenerateOutputFile=False)
 
+        x_train, y_train = self.extract_labels(match_df_training)
+        x_test, y_test = self.extract_labels(match_df_test)      
+
+        model_nb = GaussianNB()
+        model_nn = MLPClassifier
+
+        pipeline = Pipeline([
+            ('scaler', StandardScaler()),       # Step 1: Scale the data
+            ('classifier', model_nb)            # Step 2: Apply the model
+
+        ])          
+
+
+        pass
         #Return dataframe of final predictions.
 
 
 if __name__ == "__main__":
     modelInstance = xgbStack()
-    match_df_training = modelInstance.import_data(True, bGenerateOutputFile=False)
-    match_df_test = modelInstance.import_data(False, bGenerateOutputFile=False)
-    
-    x_train, y_train = modelInstance.extract_labels(match_df_training)
-    x_test, y_test = modelInstance.extract_labels(match_df_test)
+    modelInstance.train_model()
 
-    x_train = modelInstance.perform_z_score(x_train)
-    x_test = modelInstance.perform_z_score(x_test)
+
+    # match_df_training = modelInstance.import_data(True, bGenerateOutputFile=False)
+    # match_df_test = modelInstance.import_data(False, bGenerateOutputFile=False)
+
+    # x_train, y_train = modelInstance.extract_labels(match_df_training)
+    # x_test, y_test = modelInstance.extract_labels(match_df_test)
+
+    # x_train = modelInstance.perform_z_score(x_train)
+    # x_test = modelInstance.perform_z_score(x_test)

@@ -131,7 +131,13 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
     dir_team_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{file_team_data}")
     
     #Load the initial data, then start replacing the fields with the engineered data.
-    match_data = pd.read_csv(match_data_path, usecols=INPUT_COLS_MATCHDATA)
+
+    lt_input_cols = INPUT_COLS_MATCHDATA.copy()
+
+    if "rResult" in INPUT_COLS_MATCHDATA:
+        lt_input_cols.remove("rResult")
+
+    match_data = pd.read_csv(match_data_path, usecols=lt_input_cols)
     champion_data = pd.read_csv(dir_data_champion)
     match_vs_coop_data = pd.read_csv(dir_match_vs_coop)
     player_data = pd.read_csv(dir_player_data)
@@ -162,37 +168,36 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
             # player_data[f"wr{teamColor}{role}"] = (player_data[f"{teamColor} {role} Wins"] / player_data[f"{teamColor} {playLabel}"]).fillna(0.5)
             player_data[f"wr{teamColor}{role}"] = ((player_data[f"Blue {role} Wins"] + player_data[f"Red {role} Wins"]) 
                                                    / (player_data[f"Blue {playLabel}"] + player_data[f"Red {playLabel}"])).fillna(0.5)
-            
-            
+                        
             player_data_map = player_data.set_index('Name')[f"wr{teamColor}{role}"].to_dict()
             
             labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
             modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}"].map(player_data_map)
     
-    # #Implementation of Feature 2: playerChampion        
-    # player_wins_df = player_wr_champion_data.melt(
-    #     id_vars=['Player Name'],
-    #     var_name='Champion',
-    #     value_name='WinRate'
-    # )
+    #Implementation of Feature 2: playerChampion        
+    player_wins_df = player_wr_champion_data.melt(
+        id_vars=['Player Name'],
+        var_name='Champion',
+        value_name='WinRate'
+    )
 
-    # for field, newField in WIN_RATE_CHAMPION_REPLACE_COLS.items():
-    #     playerField = field.replace("Champ", "")
-    #     role_merge = modified_match_df.merge(
-    #         player_wins_df,
-    #         left_on=[playerField, field],
-    #         right_on=['Player Name', 'Champion'],
-    #         how='left'            
-    #     )
+    for field, newField in WIN_RATE_CHAMPION_REPLACE_COLS.items():
+        playerField = field.replace("Champ", "")
+        role_merge = modified_match_df.merge(
+            player_wins_df,
+            left_on=[playerField, field],
+            right_on=['Player Name', 'Champion'],
+            how='left'            
+        )
 
-    #     modified_match_df[newField] = role_merge['WinRate'].fillna(0.5)
+        modified_match_df[newField] = role_merge['WinRate'].fillna(0.5)
         
-    # #Implementation of Feature 3: coopPlayer_blue/red
-    # modified_match_df['bCoopPlayer'] = match_vs_coop_data['sumCoopBluePlayers']
-    # modified_match_df['rCoopPlayer'] = match_vs_coop_data['sumCoopRedPlayers']
+    #Implementation of Feature 3: coopPlayer_blue/red
+    modified_match_df['bCoopPlayer'] = match_vs_coop_data['sumCoopBluePlayers']
+    modified_match_df['rCoopPlayer'] = match_vs_coop_data['sumCoopRedPlayers']
         
     # #Implementation of Feature 4: vsPlayer
-    # modified_match_df['vsPlayer'] = match_vs_coop_data['sumVsBluePlayers']
+    modified_match_df['vsPlayer'] = match_vs_coop_data['sumVsBluePlayers']
 
     #Implementation of Feature 5: championRole
     # if bIncludeChampionRole_Feature:
@@ -211,22 +216,22 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
     #             labelName = f"{teamColor[0].lower()}{role[0].lower()}ChampionRole"
     #             modified_match_df[labelName] = modified_match_df[f"{teamColor.lower()}{role}Champ"].map(champion_data_map)
                 
-    # #Implementation of Feature 6
+    #Implementation of Feature 6
     modified_match_df['bCoopChampion'] = match_vs_coop_data['sumCoopBlueChampions'].fillna(0.5)
     modified_match_df['rCoopChampion'] = match_vs_coop_data['sumCoopRedChampions'].fillna(0.5)
         
-    # #Implementation of Feature 7
-    # modified_match_df['vsChampion'] = match_vs_coop_data['sumVsBlueChampions'].fillna(0.5)
+    #Implementation of Feature 7
+    modified_match_df['vsChampion'] = match_vs_coop_data['sumVsBlueChampions'].fillna(0.5)
         
-    # #Implementation of Feature 8
-    # team_data['teamTag'] = team_data['teamTag'].astype(str)
+    #Implementation of Feature 8
+    team_data['teamTag'] = team_data['teamTag'].astype(str)
 
-    # #Concept with respect to blueTeam only
-    # team_data_blue_map = team_data.set_index('teamTag')['Win Ratio Blue'].to_dict()
-    # modified_match_df['bTeamColor'] = modified_match_df['blueTeamTag'].map(team_data_blue_map)
+    #Concept with respect to blueTeam only
+    team_data_blue_map = team_data.set_index('teamTag')['Win Ratio Blue'].to_dict()
+    modified_match_df['bTeamColor'] = modified_match_df['blueTeamTag'].map(team_data_blue_map)
 
-    # team_data_red_map = team_data.set_index('teamTag')['Win Ratio Red'].to_dict()
-    # modified_match_df['rTeamColor'] = modified_match_df['redTeamTag'].map(team_data_red_map)  
+    team_data_red_map = team_data.set_index('teamTag')['Win Ratio Red'].to_dict()
+    modified_match_df['rTeamColor'] = modified_match_df['redTeamTag'].map(team_data_red_map)  
 
     #Drop all unnecessary cols from modified_match_df.
     modified_match_df.drop(columns=DROPCOLS, inplace=True)
@@ -253,6 +258,12 @@ def load_matchdata_into_df(dirMatchData):
 
     x_train_player_vs_data = generate_playerData_df(x_train)
 
+    if 'rResult' in x_train.columns:
+        x_train.drop(columns='rResult', inplace=True)
+
+    if 'rResult' in x_test.columns:        
+        x_test.drop(columns='rResult', inplace=True)
+    
     x_train = process_feature1(x_train, x_train_player_data)
     x_test = process_feature1(x_test, x_test_player_data)
     
@@ -260,7 +271,7 @@ def load_matchdata_into_df(dirMatchData):
     x_test.drop(columns=DROPCOLS, inplace=True)
 
     x_combined = pd.concat([x_train, x_test])
-
+    
     return x_train, x_test, y_train, y_test, x_combined, y_data_full_df
 
 def generate_playerData_df(df_split_dataset):
@@ -319,5 +330,7 @@ def process_feature1(x_dataset, df_player_data):
 
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
-    load_matchdata_into_df("original")
-    # load_data_from_csv(False)
+    # load_matchdata_into_df("original")
+    df_fullData = load_data_from_csv(False)
+
+    pass
