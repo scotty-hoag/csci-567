@@ -1,9 +1,10 @@
 import time
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 from sklearn.datasets import make_classification
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import accuracy_score
 from sklearn.ensemble import StackingClassifier #For XGB implementation
 from scipy.stats import zscore
@@ -12,8 +13,10 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 import load_data
+import neural_network
 
 class xgbStack:
     def __init__(self, hpNaiveBayes=None, hpNeuralNetwork=None, hpXgb=None):
@@ -49,46 +52,109 @@ class xgbStack:
         x_data = x_input.drop(columns='bResult')
 
         return x_data, y_data
+    
+    def combine_dataset(x_train, x_test, y_train, y_test):
+        """
+            Combine the dataset for performing operations such as cross-validation. Passed data
+            must not be normalized.            
+        """
+        x_combined = pd.concat([x_train, x_test])
+        y_combined = pd.concat([y_train, y_test])
 
-        
-    def execute_metaModel(self, tuple_df_baseModelPredictions):
-        #Refer to implementation described at: https://scikit-learn.org/dev/modules/generated/sklearn.ensemble.StackingClassifier.html 
-        
-        #xgb_model = StackingClassifier()
+        return x_combined, y_combined
+    
+    def test_filter_columns(x_train, x_test):
+        """
+            For testing purposes only. Drops columns from the dataset
+        """
+        #Note: If an entry is NOT commented out, then the column will be dropped.
+        list_dropcol = [    
+            # 'btPlayerRole', 
+            # 'bjPlayerRole', 
+            # 'bmPlayerRole',       
+            # 'baPlayerRole', 
+            # 'bsPlayerRole',     
+            # 'rtPlayerRole', 
+            # 'rjPlayerRole',
+            # 'rmPlayerRole', 
+            # 'raPlayerRole', 
+            # 'rsPlayerRole', 
+            # 'btPlayerChampion',
+            # 'bjPlayerChampion', 
+            # 'bmPlayerChampion', 
+            # 'baPlayerChampion',
+            # 'bsPlayerChampion', 
+            # 'rtPlayerChampion', 
+            # 'rjPlayerChampion',
+            # 'rmPlayerChampion', 
+            # 'raPlayerChampion', 
+            # 'rsPlayerChampion',
+            # 'bCoopPlayer', 
+            # 'rCoopPlayer', 
+            # 'vsPlayer', 
+            # 'bCoopChampion',
+            # 'rCoopChampion', 
+            # 'vsChampion', 
+            # 'bTeamColor', 
+            # 'rTeamColor'
+        ] 
 
-        pass
-        
+        x_train.drop(columns=list_dropcol, inplace=True)
+        x_test.drop(columns=list_dropcol, inplace=True)        
+
     def train_model(self):
         match_df_training = self.import_data(True, bGenerateOutputFile=False)
         match_df_test = self.import_data(False, bGenerateOutputFile=False)
 
         x_train, y_train = self.extract_labels(match_df_training)
-        x_test, y_test = self.extract_labels(match_df_test)      
+        x_test, y_test = self.extract_labels(match_df_test)    
 
+        #Placeholder implementation - should be replaced with model objects returned from respective base model .py files.
         model_nb = GaussianNB()
-        model_nn = MLPClassifier
+        model_nn = MLPClassifier(hidden_layer_sizes=(256,),  
+                        activation='tanh',          # Activation function for hidden layers
+                        learning_rate_init=3e-4,
+                        max_iter=500,
+                        batch_size=2275,
+                        alpha=0.0001,
+                        learning_rate='adaptive',
+                        beta_1=0.9,
+                        solver='adam')     
+
+        base_models = [
+            ('naive_bayes', model_nb),
+            ('neural_net', model_nn)
+        ]
+
+        meta_model = XGBClassifier(
+            n_estimators=14000,
+            max_depth=2,
+            learning_rate=1e-2, #Note that the paper mentions 1e-6, but this causes the model to underperform significantly.
+            min_child_weight=1,
+            gamma=0,
+            subsample=1e-1,
+            colsample_bytree=1e-9
+        )
+
+        stacking_clf = StackingClassifier(
+            estimators=base_models, 
+            final_estimator=meta_model       
+        )
 
         pipeline = Pipeline([
-            ('scaler', StandardScaler()),       # Step 1: Scale the data
-            ('classifier', model_nb)            # Step 2: Apply the model
+            ('scaler', StandardScaler()),         # Z-Score normalization occurs here
+            ('stacking', stacking_clf)            # Step 2: Stacking Classifier with meta-model
+        ])        
 
-        ])          
+        pipeline.fit(x_train, y_train)
+        y_pred = pipeline.predict(x_test)
 
-
-        pass
-        #Return dataframe of final predictions.
-
+        # Evaluate the model
+        accuracy = accuracy_score(y_test, y_pred)
+        print(f"Accuracy: {accuracy:.4f}")
+        
+        # cv_scores = cross_val_score(pipeline, x_combined, y_combined, cv=5)
 
 if __name__ == "__main__":
     modelInstance = xgbStack()
     modelInstance.train_model()
-
-
-    # match_df_training = modelInstance.import_data(True, bGenerateOutputFile=False)
-    # match_df_test = modelInstance.import_data(False, bGenerateOutputFile=False)
-
-    # x_train, y_train = modelInstance.extract_labels(match_df_training)
-    # x_test, y_test = modelInstance.extract_labels(match_df_test)
-
-    # x_train = modelInstance.perform_z_score(x_train)
-    # x_test = modelInstance.perform_z_score(x_test)

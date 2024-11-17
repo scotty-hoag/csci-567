@@ -49,16 +49,6 @@ def test_using_import_df():
     gnb.fit(match_df_train, y_train)
     y_pred = gnb.predict(match_df_test)    
 
-    # # Evaluate the model's performance
-    # accuracy = accuracy_score(y_test, y_pred)
-    # conf_matrix = confusion_matrix(y_test, y_pred)
-    # class_report = classification_report(y_test, y_pred)
-    
-    # #Print the results
-    # print("Accuracy:", accuracy)
-    # print("Confusion Matrix:\n", conf_matrix)
-    # print("Classification Report:\n", class_report)    
-
     x_combined = pd.concat([match_df_train, match_df_test])
     y_combined = pd.concat([y_train, y_test])
 
@@ -83,35 +73,14 @@ def test_using_csv_import():
     x_combined = pd.concat([x_train, x_test])
     y_combined = pd.concat([y_train, y_test])
 
+    scaler = StandardScaler()
+    scaler.fit(x_combined)
+    x_combined = scaler.transform(x_combined)
+    
+
     perform_cross_validation(gnb, x_combined, y_combined)
 
 if __name__ == "__main__":
 
     test_using_csv_import()
-    test_using_import_df()
-
-    # modelInstance = xgbStack.xgbStack()
-
-
-    # match_df_train, match_df_test, y_train, y_test, x_data_full_df, y_data_full_df = load_data.load_matchdata_into_df("original")
-    
-    # x_train = modelInstance.perform_z_score(match_df_train)
-    # x_test = modelInstance.perform_z_score(match_df_test)
-
-
-    # Evaluate the model's performance
-    # accuracy = accuracy_score(y_test, y_pred)
-    # conf_matrix = confusion_matrix(y_test, y_pred)
-    # class_report = classification_report(y_test, y_pred)
-    
-    # #Print the results
-    # print("Accuracy:", accuracy)
-    # print("Confusion Matrix:\n", conf_matrix)
-    # print("Classification Report:\n", class_report)
-
-    # predict_shuffled_y(x_train, y_train, y_test, y_data_full_df)
-    # perform_cross_validation(gnb, x_data_full_df, y_data_full_df)
-
-    # train_sizes, train_scores, test_scores = learning_curve(gnb, x_train, y_train)
-
-
+    # test_using_import_df()
