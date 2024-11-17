@@ -808,34 +808,47 @@ if __name__ == "__main__":
 
     train = False
     test = False
+    make_data_og = False
+    make_data_split = False
+    training_percent = 0.0
 
     # Handle command line arguments.
     args = sys.argv[1:]
     for i in range(len(args)):
         if (args[i] == "-makeog"):
-            num_lines, num_lines_valid, num_lines_removed = \
-                make_fixed_match_data(feature_folder="original")
-            print("Filtered original data.")
-            print("Num lines: {}, Num Lines Valid: {}, Num Lines Removed: {}".format(num_lines, num_lines_valid, num_lines_removed))
-            exit(0)
+            make_data_og = True
         elif (args[i] == "-makeinfo"):
             i += 1
             training_percent = float(args[i])
-            num_lines, num_lines_valid, num_lines_removed, \
+            make_data_split = True
+        elif (args[i] == "-train"):
+            train = True
+        elif (args[i] == "-test"):
+            test = True
+        elif (args[i] == "-seed"):
+            i += 1
+            seed = args[i]
+            random.seed(seed)
+    
+    if make_data_og:
+        num_lines, num_lines_valid, num_lines_removed = \
+            make_fixed_match_data(feature_folder="original")
+        print("Filtered original data.")
+        print("Num lines: {}, Num Lines Valid: {}, Num Lines Removed: {}".format(num_lines, num_lines_valid, num_lines_removed))
+        exit(0)
+
+    if make_data_split:
+        num_lines, num_lines_valid, num_lines_removed, \
             rowNumber_training, rowNumber_test = \
                 make_fixed_split_match_data( \
                     feature_folder_train="train", \
                     feature_folder_test="test", \
                     percent_for_training=training_percent)
-            print("Made new SPLIT feature training and test data.")
-            print("Num lines: {}, Num Lines Valid: {}, Num Lines Removed: {}, Lines Training: {} ({:.3f}), Lines Test: {} ({:.3f})".format(num_lines, num_lines_valid, num_lines_removed, \
-            rowNumber_training, float(rowNumber_training/num_lines_valid), rowNumber_test, float(rowNumber_test/num_lines_valid)))
-            exit(0)
-        elif (args[i] == "-train"):
-            train = True
-        elif (args[i] == "-test"):
-            test = True
-    
+        print("Made new SPLIT feature training and test data.")
+        print("Num lines: {}, Num Lines Valid: {}, Num Lines Removed: {}, Lines Training: {} ({:.3f}), Lines Test: {} ({:.3f})".format(num_lines, num_lines_valid, num_lines_removed, \
+        rowNumber_training, float(rowNumber_training/num_lines_valid), rowNumber_test, float(rowNumber_test/num_lines_valid)))
+        exit(0)
+
     if (not train and not test):
         print("ERROR: Must train or test. Niether selected.")
         exit(1)

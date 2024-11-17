@@ -237,9 +237,10 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
     modified_match_df.drop(columns=DROPCOLS, inplace=True)
 
     if bGenerateOutputFile:
-         outputFileName = "featureInput.csv"
+         outputFileName = "featureInput{}.csv".format("" if bIncludeChampionRole_Feature else "_noChampionRole")
          dir_file_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"{dir_feature_data}\{setType}\{outputFileName}")
          modified_match_df.to_csv(dir_file_output, index=False)
+         print("Wrote data file: {}".format(dir_file_output))
 
     return modified_match_df
 
@@ -330,7 +331,23 @@ def process_feature1(x_dataset, df_player_data):
 
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
-    # load_matchdata_into_df("original")
-    df_fullData = load_data_from_csv(False)
+    bArgIsTrainingSet = False
+    bArgGenerateOutputFile = False
+    bArgIncludeChampionRole_Feature = False
 
-    pass
+    import sys
+    args = sys.argv[1:]
+    for i in range(len(args)):
+        if (args[i] == "-train"):
+            bArgIsTrainingSet = True
+        elif (args[i] == "-test"):
+            bArgIsTrainingSet = False
+        elif (args[i] == "-o" or args[i] == "-O"):
+            bArgGenerateOutputFile = True
+        elif (args[i] == "-c" or args[i] == "-C"):
+            bArgIncludeChampionRole_Feature = True
+    
+    load_data_from_csv( \
+        bIsTrainingSet=bArgIsTrainingSet, \
+        bGenerateOutputFile=bArgGenerateOutputFile, \
+        bIncludeChampionRole_Feature=bArgIncludeChampionRole_Feature)
