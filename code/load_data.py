@@ -1,6 +1,11 @@
-import numpy as np
 import pandas as pd
+import shutil
+import sys
 import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import makedata
 
 from sklearn.model_selection import train_test_split
 
@@ -90,7 +95,7 @@ DROPCOLS = [
 TEAM_COLOR = ["Blue", "Red"]
 TEAM_ROLE = ["Top", "Jungle", "Middle", "ADC", "Support"]
 
-def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
+def load_data_from_csv(bIsTrainingSet, bIsGeneratedSet=True, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
     """
         Loads data from the feature CSV files and morphs the relevant fields into a dataframe for training use.
 
@@ -110,7 +115,11 @@ def load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampi
     """
     #Note: We assume that the folder structure will be consistent throughout the development process.
     dir_feature_data = "feature_data"
-    setType = "train" if bIsTrainingSet else "test"
+    
+    if bIsGeneratedSet:
+        setType = "temp_train" if bIsTrainingSet else "temp_test"
+    else:
+        setType = "train" if bIsTrainingSet else "test"
 
     file_match_data = "match_info.csv"
     file_data_champion = "champion_data.csv"
@@ -252,7 +261,7 @@ def load_matchdata_into_df(dirMatchData):
     full_df = match_data.drop(columns='bResult')
     y_data_full_df = match_data['bResult']
 
-    x_train, x_test, y_train, y_test = train_test_split(full_df, y_data_full_df, test_size=0.1, random_state=42)
+    x_train, x_test, y_train, y_test = train_test_split(full_df, y_data_full_df, test_size=0.1, stratify=y_data_full_df, random_state=42)
 
     x_train_player_data = generate_playerData_df(x_train)
     x_test_player_data = generate_playerData_df(x_test)
@@ -329,25 +338,61 @@ def process_feature1(x_dataset, df_player_data):
 
     return x_dataset
 
+def generate_temp_csv_data():
+    tempTrain_dirName = "temp_train"
+    tempTest_dirName = "temp_test"
+
+    if os.path.exists(f"feature_data\\{tempTrain_dirName}"):
+        shutil.rmtree(f"feature_data\\{tempTrain_dirName}")
+    
+    os.mkdir(f"feature_data\\{tempTrain_dirName}")
+
+    if os.path.exists(f"feature_data\\{tempTest_dirName}"):
+        shutil.rmtree(f"feature_data\\{tempTest_dirName}")
+    
+    os.mkdir(f"feature_data\\{tempTest_dirName}")
+
+    makedata.make_fixed_split_match_data(feature_folder_train=tempTrain_dirName, feature_folder_test=tempTest_dirName, percent_for_training=0.90)
+
+    for folder in [tempTrain_dirName, tempTest_dirName]:
+        makedata.parse_match_info(folder, feature_folder_original_data="original")
+        makedata.WritePlayerData(folder)
+        makedata.WriteChampionData(folder)
+        makedata.WritePlayerWinsWithEachChampionData(folder)
+        makedata.WriteTeamData(folder)
+        makedata.WritePlayerVsData(folder)
+        makedata.WriteChampionVsData(folder)
+        makedata.WriteMatchVSAndCoopData(folder)
+
+    pass
+
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
-    bArgIsTrainingSet = False
-    bArgGenerateOutputFile = False
-    bArgIncludeChampionRole_Feature = False
 
-    import sys
-    args = sys.argv[1:]
-    for i in range(len(args)):
-        if (args[i] == "-train"):
-            bArgIsTrainingSet = True
-        elif (args[i] == "-test"):
-            bArgIsTrainingSet = False
-        elif (args[i] == "-o" or args[i] == "-O"):
-            bArgGenerateOutputFile = True
-        elif (args[i] == "-c" or args[i] == "-C"):
-            bArgIncludeChampionRole_Feature = True
+    # x_train, x_test, y_train, y_test, x_combined, y_data_full_df = load_matchdata_into_df("original")
+
+    generate_temp_csv_data()
+
+    # makedata.make_fixed_split_match_data(feature_folder_train="temp_train", feature_folder_test="temp_test")
+    pass
+
+    # bArgIsTrainingSet = False
+    # bArgGenerateOutputFile = False
+    # bArgIncludeChampionRole_Feature = False
+
+    # import sys
+    # args = sys.argv[1:]
+    # for i in range(len(args)):
+    #     if (args[i] == "-train"):
+    #         bArgIsTrainingSet = True
+    #     elif (args[i] == "-test"):
+    #         bArgIsTrainingSet = False
+    #     elif (args[i] == "-o" or args[i] == "-O"):
+    #         bArgGenerateOutputFile = True
+    #     elif (args[i] == "-c" or args[i] == "-C"):
+    #         bArgIncludeChampionRole_Feature = True
     
-    load_data_from_csv( \
-        bIsTrainingSet=bArgIsTrainingSet, \
-        bGenerateOutputFile=bArgGenerateOutputFile, \
-        bIncludeChampionRole_Feature=bArgIncludeChampionRole_Feature)
+    # load_data_from_csv( \
+    #     bIsTrainingSet=bArgIsTrainingSet, \
+    #     bGenerateOutputFile=bArgGenerateOutputFile, \
+    #     bIncludeChampionRole_Feature=bArgIncludeChampionRole_Feature)
