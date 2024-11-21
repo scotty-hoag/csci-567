@@ -1,12 +1,19 @@
 import time
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 from sklearn.datasets import make_classification
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score, RepeatedKFold
 from sklearn.metrics import accuracy_score
 from sklearn.ensemble import StackingClassifier #For XGB implementation
 from scipy.stats import zscore
+
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 import load_data
 
@@ -30,8 +37,8 @@ class xgbStack:
     
     #Import the data, either by processing all the feature csv files along with the matchdata.csv file or 
     #inputting a precompiled input file.
-    def import_data(self, bIsTrainingSet, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
-        df_input = load_data.load_data_from_csv(bIsTrainingSet, bGenerateOutputFile=bGenerateOutputFile, 
+    def import_data(self, bIsTrainingSet, bIsGeneratedSet=True, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False):
+        df_input = load_data.load_data_from_csv(bIsTrainingSet, bIsGeneratedSet=bIsGeneratedSet, bGenerateOutputFile=bGenerateOutputFile, 
                                                 bIncludeChampionRole_Feature=bIncludeChampionRole_Feature)
         
         return df_input
@@ -45,51 +52,202 @@ class xgbStack:
 
         return x_data, y_data
     
-    def perform_z_score(self, x_input):
-        return x_input.apply(zscore)
-
-    def parallelExecute_LearningModels(self):
+    def combine_dataset(self, x_train, x_test, y_train, y_test):
         """
-            Execute both the naive bayes model and NN concurrently.
-
+            Combine the dataset for performing operations such as cross-validation. Passed data
+            must not be normalized.            
         """
-        # with ThreadPoolExecutor() as executor:
-        #     pass
+        x_combined = pd.concat([x_train, x_test]).reset_index()
+        y_combined = pd.concat([y_train, y_test]).reset_index()
 
-            # future_1 = executor.submit(train_and_predict, model_1, X_train, y_train, X_test)
-            # future_2 = executor.submit(train_and_predict, model_2, X_train, y_train, X_test)
-        
-            # Retrieve the predictions
-            # predictions_1 = future_1.result()
-            # predictions_2 = future_2.result()
-        
+        x_combined.drop(columns="index",inplace=True)
+        y_combined.drop(columns="index",inplace=True)
 
-        #Return a tuple containing the generated dataframe predictions for each base model.
+        return x_combined, y_combined
+    
+    def test_filter_columns(self, x_train, x_test):
+        """
+            For testing purposes only. Drops columns from the dataset
+        """
+        #Note: If an entry is NOT commented out, then the column will be dropped.
+        list_dropcol = [    
+            # 'btPlayerRole', 
+            # 'bjPlayerRole', 
+            # 'bmPlayerRole',       
+            # 'baPlayerRole', 
+            # 'bsPlayerRole',     
+            # 'rtPlayerRole', 
+            # 'rjPlayerRole',
+            # 'rmPlayerRole', 
+            # 'raPlayerRole', 
+            # 'rsPlayerRole', 
+            # 'btPlayerChampion',
+            # 'bjPlayerChampion', 
+            # 'bmPlayerChampion', 
+            # 'baPlayerChampion',
+            # 'bsPlayerChampion', 
+            # 'rtPlayerChampion', 
+            # 'rjPlayerChampion',
+            # 'rmPlayerChampion', 
+            # 'raPlayerChampion', 
+            # 'rsPlayerChampion',
+            # 'bCoopPlayer', 
+            # 'rCoopPlayer', 
+            # 'vsPlayer', 
+            # 'bCoopChampion',
+            # 'rCoopChampion', 
+            # 'vsChampion', 
+            # 'bTeamColor', 
+            # 'rTeamColor'
+        ] 
 
-        
-    def execute_metaModel(self, tuple_df_baseModelPredictions):
-        #Refer to implementation described at: https://scikit-learn.org/dev/modules/generated/sklearn.ensemble.StackingClassifier.html 
-        
-        #xgb_model = StackingClassifier()
+        if len(list_dropcol) > 0:
+            x_train.drop(columns=list_dropcol, inplace=True)
+            x_test.drop(columns=list_dropcol, inplace=True) 
 
-        pass
-        
+    def test_perform_cross_validation(self, pipeline, x_training, y_training):
+
+        #The default parameters in the paper mention n_splits=10, n_repeats=5, but this configuration can take a long time to process.
+        repeated_kfold = RepeatedKFold(n_splits=10, n_repeats=1, random_state=42)
+        scores = cross_val_score(pipeline, x_training, y_training, cv=repeated_kfold)
+
+        print("Cross-validation scores:", scores)
+        print("Mean cross-validation score:", scores.mean())
+        print("Standard deviation of cross-validation scores:", scores.std())
+
     def train_model(self):
-        matchData_df = self.import_data()
-        self.split_data()
-        self.parallelExecute_LearningModels()
-        self.execute_metaModel()
+        load_data.generate_temp_csv_data()
 
-        #Return dataframe of final predictions.
+        match_df_training = self.import_data(True, bIsGeneratedSet=True, bGenerateOutputFile=False)
+        match_df_test = self.import_data(False, bIsGeneratedSet=True, bGenerateOutputFile=False)
+
+        x_train, y_train = self.extract_labels(match_df_training)
+        x_test, y_test = self.extract_labels(match_df_test)    
+
+        #Placeholder implementation - should be replaced with model objects returned from respective base model .py files.
+        model_nb = GaussianNB()
+        model_nn = MLPClassifier(hidden_layer_sizes=(256,),  
+                        activation='tanh',          # Activation function for hidden layers
+                        learning_rate_init=3e-4,
+                        max_iter=500,
+                        batch_size=2275,
+                        alpha=0.0001,
+                        learning_rate='adaptive',
+                        beta_1=0.9,
+                        solver='adam')     
+
+        base_models = [
+            ('naive_bayes', model_nb),
+            ('neural_net', model_nn)
+        ]
+
+        meta_model = XGBClassifier(
+            n_estimators=14000,
+            max_depth=2,
+            # learning_rate=1e-6, #Note that the paper mentions 1e-6, but this causes the model to underperform significantly.
+            min_child_weight=1,
+            gamma=0,
+            subsample=0.15,
+            colsample_bytree=1e-9
+        )
+
+        stacking_clf = StackingClassifier(
+            estimators=base_models, 
+            final_estimator=meta_model       
+        )
+
+        pipeline = Pipeline([
+            ('scaler', StandardScaler()),         # Z-Score normalization occurs here
+            ('stacking', stacking_clf)            # Step 2: Stacking Classifier with meta-model
+        ])        
+
+        #Debug sequence
+        self.test_filter_columns(x_train, x_test)
+
+        self.test_perform_cross_validation(pipeline, x_train, y_train)
+        
+        pipeline.fit(x_train, y_train)
+        y_pred = pipeline.predict(x_test)
+
+        # Evaluate the model
+        accuracy = accuracy_score(y_test, y_pred)
+        print(f"Accuracy: {accuracy:.4f}")
+
+    def train_model_df(self):
+        """
+            This function is for testing purposes only. Uses the pandas implementation to dynamically
+            generate the test/train datasets instead of loading the CSV files.
+
+        """
+        x_train, x_test, y_train, y_test, x_combined_df, y_combined_df = load_data.load_matchdata_into_df("original")
+
+        # x_train, y_train = self.extract_labels(match_df_training)
+        # x_test, y_test = self.extract_labels(match_df_test)    
+
+        #Placeholder implementation - should be replaced with model objects returned from respective base model .py files.
+        model_nb = GaussianNB()
+        model_nn = MLPClassifier(hidden_layer_sizes=(256,),  
+                        activation='tanh',          # Activation function for hidden layers
+                        learning_rate_init=3e-4,
+                        max_iter=500,
+                        batch_size=2275,
+                        alpha=0.0001,
+                        learning_rate='adaptive',
+                        beta_1=0.9,
+                        solver='adam')     
+
+        base_models = [
+            ('naive_bayes', model_nb),
+            ('neural_net', model_nn)
+        ]
+
+        meta_model = XGBClassifier(
+            booster='gbtree',
+            n_estimators=14000,
+            max_depth=2,
+            # learning_rate=1e-6, #Note that the paper mentions 1e-6, but this causes the model to underperform significantly.
+            min_child_weight=1,
+            gamma=0,
+            subsample=0.15,
+            colsample_bytree=1e-9
+        )
+
+        stacking_clf = StackingClassifier(
+            estimators=base_models, 
+            final_estimator=meta_model       
+        )
+
+        pipeline = Pipeline([
+            ('scaler', StandardScaler()),         # Z-Score normalization occurs here
+            ('stacking', stacking_clf)            # Step 2: Stacking Classifier with meta-model
+        ])        
+
+        # pipeline.fit(x_train, y_train)
+        # y_pred = pipeline.predict(x_test)
+
+        # Evaluate the model
+        # accuracy = accuracy_score(y_test, y_pred)
+        # print(f"Accuracy: {accuracy:.4f}")
+        
+        self.test_perform_cross_validation(pipeline, x_train, y_train)
+        
+        pipeline.fit(x_train, y_train)
+        y_pred = pipeline.predict(x_test)
+
+        # Evaluate the model
+        accuracy = accuracy_score(y_test, y_pred)
+        print(f"Accuracy: {accuracy:.4f}")
 
 
 if __name__ == "__main__":
     modelInstance = xgbStack()
-    match_df_training = modelInstance.import_data(True, bGenerateOutputFile=False)
-    match_df_test = modelInstance.import_data(False, bGenerateOutputFile=False)
-    
-    x_train, y_train = modelInstance.extract_labels(match_df_training)
-    x_test, y_test = modelInstance.extract_labels(match_df_test)
 
-    x_train = modelInstance.perform_z_score(x_train)
-    x_test = modelInstance.perform_z_score(x_test)
+    startTime = time.time()
+
+    modelInstance.train_model()
+    # modelInstance.train_model_df()
+
+    endTime = time.time()
+
+    elapsed_time = round(endTime - startTime, 3)
+    print(f"Execution time: {elapsed_time}") 
