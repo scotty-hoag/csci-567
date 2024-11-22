@@ -49,3 +49,15 @@ Done.
 Creating new feature data: Test Set.
 Done.
 
+
+Neural Network
+
+To get the neural net model from code/neuralnetwork.py, call the get_lol_nnet_model method.
+
+Parameters:
+- train_model: Bool. If true, load the training and testing data and train the model before returning it. If false, return the model without training. 
+- in_training_type: Enum selector for hyperparameter set to use. Default is to use the hyperparameters discovered from tuning.
+- in_random_seed: Random seed to use for training. Default is 42. 
+- in_training_data_path: Relative path to the training data.
+- in_testing_data_path: Relative path to the testing data.
+- print_debug: If true, print the training status of the model.fit method. If false, do not print any of the training output.
