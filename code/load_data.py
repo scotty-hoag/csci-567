@@ -268,6 +268,8 @@ def load_matchdata_into_df(dirMatchData):
 
     x_train_player_vs_data = generate_playerData_df(x_train)
 
+    x_train_player_champion_winRate = generate_player_champion_winRate(x_train, y_train)
+
     if 'rResult' in x_train.columns:
         x_train.drop(columns='rResult', inplace=True)
 
@@ -276,6 +278,10 @@ def load_matchdata_into_df(dirMatchData):
     
     x_train = process_feature1(x_train, x_train_player_data)
     x_test = process_feature1(x_test, x_test_player_data)
+
+    x_train = process_feature2(x_train, x_train_player_champion_winRate)
+
+    # x_train['btPlayerChampion'] = process_feature2_test(x_train, x_train_player_champion_winRate, 'blueTop', 'blueTopChamp')
     
     x_train.drop(columns=DROPCOLS, inplace=True)
     x_test.drop(columns=DROPCOLS, inplace=True)
@@ -328,6 +334,66 @@ def generate_player_vs_df(df_split_dataset):
     df_team_1 = df_split_dataset
     pass
 
+def generate_player_champion_winRate(df_split_dataset, df_training_labels):
+    """
+        Generates a support dataframe that contains a player's win rate for specific
+        champions. This is in support of implementing feature 2 from the research paper.
+    """
+    modified_match_data = df_split_dataset.copy()
+    modified_match_data['match_id'] = range(1, len(modified_match_data) + 1)
+    modified_match_data['bResult'] = df_training_labels
+    
+    blue_team = modified_match_data.melt(
+        id_vars=['match_id', 'bResult'],
+        value_vars=['blueTop', 'blueJungle', 'blueADC', 'blueSupport', 'blueMiddle'],
+        var_name='position',
+        value_name='player'
+    )
+
+    blue_team['champion'] = modified_match_data.melt(
+        id_vars=['match_id'],
+        value_vars=['blueTopChamp', 'blueJungleChamp', 'blueADCChamp', 'blueSupportChamp', 'blueMiddleChamp'],
+        value_name='champion'
+    )['champion']
+
+    blue_team['team'] = 'blue'
+
+    red_team = modified_match_data.melt(
+        id_vars=['match_id', 'bResult'],
+        value_vars=['redTop', 'redJungle', 'redADC', 'redSupport', 'redMiddle'],
+        var_name='position',
+        value_name='player'
+    )
+    red_team['champion'] = modified_match_data.melt(
+        id_vars=['match_id'],
+        value_vars=['redTopChamp', 'redJungleChamp', 'redADCChamp', 'redSupportChamp', 'redMiddleChamp'],
+        value_name='champion'
+    )['champion']
+
+    red_team['team'] = 'red'
+
+    # Combine blue and red team data
+    combined_df = pd.concat([blue_team, red_team])
+
+    # Calculate number of times a player has used a certain champion
+    usage_count = combined_df.groupby(['player', 'champion']).size().reset_index(name='usage_count')
+
+    # Calculate number of times a player has won with a certain champion
+    combined_df['win'] = (combined_df['team'] == 'blue') & (combined_df['bResult'] == 1) 
+
+    # Calculate number of times a player has won with a certain champion
+    combined_df['win'] = (combined_df['team'] == 'blue') & (combined_df['bResult'] == 1) | \
+                        (combined_df['team'] == 'red') & (combined_df['bResult'] == 0)
+
+    win_count = combined_df[combined_df['win']].groupby(['player', 'champion']).size().reset_index(name='win_count')
+
+    # Merge usage and win counts
+    result = pd.merge(usage_count, win_count, how='left', on=['player', 'champion'])
+    result['win_count'] = result['win_count'].fillna(0)
+    result['win_ratio'] = result['win_count'] / result['usage_count']
+
+    return result 
+
 def process_feature1(x_dataset, df_player_data):
     for teamColor in TEAM_COLOR:
         for role in TEAM_ROLE:            
@@ -335,6 +401,20 @@ def process_feature1(x_dataset, df_player_data):
             
             labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
             x_dataset[labelName] = x_dataset[f"{teamColor.lower()}{role}"].map(player_data_map)
+
+    return x_dataset
+
+def process_feature2(x_dataset, df_player_champion_data):
+    for teamColor in TEAM_COLOR:
+        for role in TEAM_ROLE:
+            combinedLabel = f"{teamColor.lower()}{role}"
+            merged_df = None
+            merged_df = x_dataset.merge(df_player_champion_data, how='right', 
+                                        left_on=[combinedLabel, f"{combinedLabel}Champ"], 
+                                        right_on=['player', 'champion'])
+
+            labelName = WIN_RATE_CHAMPION_REPLACE_COLS[f"{teamColor.lower()}{role}Champ"]
+            x_dataset[labelName] = merged_df['win_ratio']
 
     return x_dataset
 
@@ -369,9 +449,9 @@ def generate_temp_csv_data():
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
 
-    # x_train, x_test, y_train, y_test, x_combined, y_data_full_df = load_matchdata_into_df("original")
+    x_train, x_test, y_train, y_test, x_combined, y_data_full_df = load_matchdata_into_df("original")
 
-    generate_temp_csv_data()
+    # generate_temp_csv_data()
 
     # makedata.make_fixed_split_match_data(feature_folder_train="temp_train", feature_folder_test="temp_test")
     pass
