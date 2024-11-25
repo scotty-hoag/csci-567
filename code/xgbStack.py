@@ -240,8 +240,8 @@ if __name__ == "__main__":
 
     startTime = time.time()
 
-    modelInstance.train_model()
-    # modelInstance.train_model_df()
+    # modelInstance.train_model()
+    modelInstance.train_model_df()
 
     endTime = time.time()
 
