@@ -47,14 +47,14 @@ for train_index, test_index in rkf.split(X_train):
 # fitting the model with the probabilities associated with the highest probability
 # like the paper mentioned
 gnb = GaussianNB(priors=[best_probs['prob_red'], best_probs['prob_blue']])
-gnb.fit(X_train, y_train)
+# gnb.fit(X_train, y_train)
 # model must be fit before creating priors
 # actually not sure how necessary this is
-priors = gnb.predict_proba(X_train)
+# priors = gnb.predict_proba(X_train)
 
-y_predict = gnb.predict(X_test)
-mean_accuracy = gnb.score(X_test, y_test)
-accuracy = accuracy_score(y_test, y_predict, normalize=True)
+# y_predict = gnb.predict(X_test)
+# mean_accuracy = gnb.score(X_test, y_test)
+# accuracy = accuracy_score(y_test, y_predict, normalize=True)
 
 def __init__(self):
     return gnb
