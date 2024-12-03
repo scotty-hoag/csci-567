@@ -10,20 +10,25 @@ HPARAMS_DEFAULTS = 0
 HPARAMS_PAPER = 1
 HPARAMS_CUSTOM = 2
 
+DATA_PREPROCESSING_SCOTTY = 0
+DATA_PREPROCESSING_DAMITA = 1
+
 OP_RMSPROP = 0
 OP_SGD = 1
 
 
 glob_training_path_without_champions = "./../feature_data/train/featureInput_noChampionRole_ZSCORED.csv"
 glob_training_path_with_champions = "./../feature_data/train/featureInput_ZSCORED.csv"
+glob_training_path_damita = "./damita/trial_train_data.csv"
 glob_training_path_default = glob_training_path_without_champions
 
 glob_testing_path_without_champions = "./../feature_data/test/featureInput_noChampionRole_ZSCORED.csv"
 glob_testing_path_with_champions = "./../feature_data/test/featureInput_ZSCORED.csv"
+glob_testing_path_damita = "./damita/trial_test_data.csv"
 glob_testing_path_default = glob_testing_path_without_champions
 
 
-def get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_CUSTOM, in_random_seed=42, in_training_data_path=glob_training_path_default, in_testing_data_path=glob_testing_path_default, print_debug=False):
+def get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_PAPER, in_random_seed=42, in_training_data_path=glob_training_path_default, in_testing_data_path=glob_testing_path_default, print_debug=False, data_type=None):
 
     training_type = in_training_type
     op_type = OP_RMSPROP
@@ -97,7 +102,11 @@ def get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_CUSTOM, in_ran
     test_path = Path(in_testing_data_path)
 
     #names = ["Match Result", "Blue Top Player", "Blue Jungle Player", "Blue Middle Player", "Blue ADC Player", "Blue Support Player", "Red Top Player", "Red Jungle Player", "Red Middle Player", "Red ADC Player", "Red Support Player", "Blue Top Champion", "Blue Jungle Champion", "Blue Middle Champion", "Blue ADC Champion", "Blue Support Champion", "Red Top Champion", "Red Jungle Champion", "Red Middle Champion", "Red ADC Champion", "Red Support Champion", "Blue Player Cooperation", "Red Player Cooperation", "Blue vs Red Player", "Blue Champion Cooperation", "Red Champion Cooperation", "Blue vs Red Champion", "Blue Team Win Rate When Blue", "Red Team Win Rate When Red"]
+
     names = ["bResult", "btPlayerRole", "bjPlayerRole", "bmPlayerRole", "baPlayerRole", "bsPlayerRole", "rtPlayerRole", "rjPlayerRole", "rmPlayerRole", "raPlayerRole", "rsPlayerRole", "btPlayerChampion", "bjPlayerChampion", "bmPlayerChampion", "baPlayerChampion", "bsPlayerChampion", "rtPlayerChampion", "rjPlayerChampion", "rmPlayerChampion", "raPlayerChampion", "rsPlayerChampion", "bCoopPlayer", "rCoopPlayer", "vsPlayer", "bCoopChampion", "rCoopChampion", "vsChampion", "bTeamColor", "rTeamColor"]
+    
+    if data_type == DATA_PREPROCESSING_DAMITA:
+        names = ["btPlayerRole", "bjPlayerRole", "bmPlayerRole", "baPlayerRole", "bsPlayerRole", "rtPlayerRole", "rjPlayerRole", "rmPlayerRole", "raPlayerRole", "rsPlayerRole", "btPlayerChampion", "bjPlayerChampion", "bmPlayerChampion", "baPlayerChampion", "bsPlayerChampion", "rtPlayerChampion", "rjPlayerChampion", "rmPlayerChampion", "raPlayerChampion", "rsPlayerChampion", "bCoopPlayer", "rCoopPlayer", "bCoopChampion", "rCoopChampion", "vsPlayer", "vsChampion", "bTeamColor", "rTeamColor", "bResult"]
 
     # Load our pre-processed training and test sets. 
     # The skiprows value just removes the first row of the CSV which are labels instead of data.
@@ -128,6 +137,8 @@ if __name__ == "__main__":
     train_path = glob_training_path_default
     test_path = glob_testing_path_default
 
+    data_type = None
+
     args = sys.argv[1:]
     for i in range(len(args)):
         if (args[i] == "-train"):
@@ -136,7 +147,12 @@ if __name__ == "__main__":
         if (args[i] == "-test"):
             i += 1
             test_path = args[i]
+        if (args[i] == "-damita"):
+            data_type = DATA_PREPROCESSING_DAMITA
+            train_path = glob_training_path_damita
+            test_path = glob_testing_path_damita
 
-    get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_CUSTOM, in_random_seed=42, in_training_data_path=train_path, in_testing_data_path=test_path, print_debug=True)
+
+    get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_PAPER, in_random_seed=42, in_training_data_path=train_path, in_testing_data_path=test_path, print_debug=True, data_type=data_type)
 
     exit(0)
