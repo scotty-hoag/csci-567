@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.ensemble import StackingClassifier #For XGB implementation
 from scipy.stats import zscore
 
-from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -108,8 +108,8 @@ class xgbStack:
 
     def test_perform_cross_validation(self, pipeline, x_training, y_training):
 
-        #The default parameters in the paper mention n_splits=10, n_repeats=5, but this configuration can take a long time to process.
-        repeated_kfold = RepeatedKFold(n_splits=10, n_repeats=1, random_state=42)
+        #The default parameters in the paper menvbghtion n_splits=10, n_repeats=5, but this configuration can take a long time to process.
+        repeated_kfold = RepeatedKFold(n_splits=3, n_repeats=1, random_state=42)
         scores = cross_val_score(pipeline, x_training, y_training, cv=repeated_kfold)
 
         print("Cross-validation scores:", scores)
@@ -177,11 +177,9 @@ class xgbStack:
     def train_model_df(self):
         x_train, x_test, y_train, y_test, x_combined_df, y_combined_df = load_data.load_matchdata_into_df("original")
 
-        # x_train, y_train = self.extract_labels(match_df_training)
-        # x_test, y_test = self.extract_labels(match_df_test)    
-
         #Placeholder implementation - should be replaced with model objects returned from respective base model .py files.
         model_nb = GaussianNB()
+        # model_nb = MultinomialNB()
         model_nn = MLPClassifier(hidden_layer_sizes=(256,),  
                         activation='tanh',          # Activation function for hidden layers
                         learning_rate_init=3e-4,
@@ -218,12 +216,8 @@ class xgbStack:
             ('stacking', stacking_clf)            # Step 2: Stacking Classifier with meta-model
         ])        
 
-        # pipeline.fit(x_train, y_train)
-        # y_pred = pipeline.predict(x_test)
-
-        # Evaluate the model
-        # accuracy = accuracy_score(y_test, y_pred)
-        # print(f"Accuracy: {accuracy:.4f}")
+        #Debug sequence
+        self.test_filter_columns(x_train, x_test)
         
         self.test_perform_cross_validation(pipeline, x_train, y_train)
         
@@ -233,6 +227,48 @@ class xgbStack:
         # Evaluate the model
         accuracy = accuracy_score(y_test, y_pred)
         print(f"Accuracy: {accuracy:.4f}")
+
+    def returnModel(self):        
+        #Placeholder implementation - should be replaced with model objects returned from respective base model .py files.
+        model_nb = GaussianNB()
+        # model_nb = MultinomialNB()
+        model_nn = MLPClassifier(hidden_layer_sizes=(256,),  
+                        activation='tanh',          # Activation function for hidden layers
+                        learning_rate_init=3e-4,
+                        max_iter=500,
+                        batch_size=2275,
+                        alpha=0.0001,
+                        learning_rate='adaptive',
+                        beta_1=0.9,
+                        solver='adam')     
+
+        base_models = [
+            ('naive_bayes', model_nb),
+            ('neural_net', model_nn)
+        ]
+
+        meta_model = XGBClassifier(
+            booster='gbtree',
+            n_estimators=14000,
+            max_depth=2,
+            # learning_rate=1e-6, #Note that the paper mentions 1e-6, but this causes the model to underperform significantly.
+            min_child_weight=1,
+            gamma=0,
+            subsample=0.15,
+            colsample_bytree=1e-9
+        )
+
+        stacking_clf = StackingClassifier(
+            estimators=base_models, 
+            final_estimator=meta_model       
+        )
+
+        pipeline = Pipeline([
+            ('scaler', StandardScaler()),         # Z-Score normalization occurs here
+            ('stacking', stacking_clf)            # Step 2: Stacking Classifier with meta-model
+        ])
+
+        return pipeline
 
 
 if __name__ == "__main__":

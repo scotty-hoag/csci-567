@@ -279,6 +279,15 @@ def load_matchdata_into_df(dirMatchData):
     dt_train_player_vs = generate_player_vs_df(x_train, y_train)
     dt_test_player_vs = generate_player_vs_df(x_test, y_test)
 
+    dt_train_playerChampion_vs = generate_player_with_champion_wr_df(x_train, y_train)
+    dt_test_playerChampion_vs = generate_player_with_champion_wr_df(x_test, y_test)
+
+    dt_train_champion_vs = generate_champion_vs_df(x_train, y_train)
+    dt_test_champion_vs = generate_champion_vs_df(x_test, y_test)
+
+    df_train_blue_team_wr, df_train_red_team_wr = generate_team_wr(x_train, y_train)
+    df_test_blue_team_wr, df_test_red_team_wr = generate_team_wr(x_test, y_test)
+
     if 'rResult' in x_train.columns:
         x_train.drop(columns='rResult', inplace=True)
 
@@ -299,6 +308,15 @@ def load_matchdata_into_df(dirMatchData):
 
     # x_train['btPlayerChampion'] = process_feature2_test(x_train, x_train_player_champion_winRate, 'blueTop', 'blueTopChamp')
     
+    x_train = process_feature6(x_train, dt_train_playerChampion_vs)
+    x_test = process_feature6(x_test, dt_test_playerChampion_vs)
+
+    x_train = process_feature7(x_train, dt_train_champion_vs)
+    x_test = process_feature7(x_test, dt_test_champion_vs)
+
+    x_train = process_feature8(x_train, df_train_blue_team_wr, df_train_red_team_wr)
+    x_test = process_feature8(x_test, df_test_blue_team_wr, df_test_red_team_wr)
+
     x_train.drop(columns=DROPCOLS, inplace=True)
     x_test.drop(columns=DROPCOLS, inplace=True)
 
@@ -372,13 +390,13 @@ def generate_player_champion_winRate(df_split_dataset, df_training_labels):
 
     red_team = modified_match_data.melt(
         id_vars=['match_id', 'bResult'],
-        value_vars=['redTop', 'redJungle', 'redMiddle', 'redADC', 'redSupport', ],
+        value_vars=['redTop', 'redJungle', 'redMiddle', 'redADC', 'redSupport'],
         var_name='position',
         value_name='player'
     )
     red_team['champion'] = modified_match_data.melt(
         id_vars=['match_id'],
-        value_vars=['redTopChamp', 'redJungleChamp', 'redMiddleChamp', 'redADCChamp', 'redSupportChamp', ],
+        value_vars=['redTopChamp', 'redJungleChamp', 'redMiddleChamp', 'redADCChamp', 'redSupportChamp'],
         value_name='champion'
     )['champion']
 
@@ -389,9 +407,6 @@ def generate_player_champion_winRate(df_split_dataset, df_training_labels):
 
     # Calculate number of times a player has used a certain champion
     usage_count = combined_df.groupby(['player', 'champion']).size().reset_index(name='usage_count')
-
-    # Calculate number of times a player has won with a certain champion
-    combined_df['win'] = (combined_df['team'] == 'blue') & (combined_df['bResult'] == 1) 
 
     # Calculate number of times a player has won with a certain champion
     combined_df['win'] = (combined_df['team'] == 'blue') & (combined_df['bResult'] == 1) | \
@@ -503,7 +518,138 @@ def generate_player_vs_df(df_split_dataset, df_training_labels):
     dt_player_vs = player_vs_df.set_index(['player', 'opponent'])['win_ratio'].to_dict()
 
     return dt_player_vs
+
+def generate_player_with_champion_wr_df(df_split_dataset, df_training_labels):
+    #Implementation of feature 6: coopChampion-blue/red
+    modified_match_data = df_split_dataset.copy()
+    modified_match_data['match_id'] = range(1, len(modified_match_data) + 1)
+    modified_match_data['bResult'] = df_training_labels
+
+    blue_team = pd.DataFrame()
+    red_team = pd.DataFrame()
+
+    blue_team = modified_match_data.melt(
+        id_vars=['match_id', 'bResult'],
+        value_vars=['blueTop', 'blueJungle', 'blueMiddle', 'blueADC', 'blueSupport', ],
+        var_name='position',
+        value_name='player'
+    )
+
+    blue_team['champion'] = modified_match_data.melt(
+        id_vars=['match_id'],
+        value_vars=['blueTopChamp', 'blueJungleChamp', 'blueMiddleChamp', 'blueADCChamp', 'blueSupportChamp'],
+        value_name='champion'
+    )['champion']
+
+    blue_team['team'] = 'blue'
+
+    red_team = modified_match_data.melt(
+        id_vars=['match_id', 'bResult'],
+        value_vars=['redTop', 'redJungle', 'redMiddle', 'redADC', 'redSupport'],
+        var_name='position',
+        value_name='player'
+    )
+    red_team['champion'] = modified_match_data.melt(
+        id_vars=['match_id'],
+        value_vars=['redTopChamp', 'redJungleChamp', 'redMiddleChamp', 'redADCChamp', 'redSupportChamp'],
+        value_name='champion'
+    )['champion']
+
+    red_team['team'] = 'red'
+
+    # Combine blue and red team data
+    combined_df = pd.concat([blue_team, red_team])
+
+    # Calculate number of times a player has won with a certain champion
+    combined_df['win'] = (combined_df['team'] == 'blue') & (combined_df['bResult'] == 1) | \
+                        (combined_df['team'] == 'red') & (combined_df['bResult'] == 0)
+
+    # Calculate number of times a player has used a certain champion
+    combined_df['position'] = combined_df['position'].str.replace('red|blue', '', regex=True)
+
+    win_count = combined_df[combined_df['win']].groupby(['champion', 'position']).size().reset_index(name='win_count')
+    usage_count = combined_df.groupby(['champion', 'position']).size().reset_index(name='usage_count')
+
+    # Merge usage and win counts
+    df_champion_wr = pd.merge(usage_count, win_count, how='left', on=['champion', 'position'])
+    df_champion_wr['win_count'] = df_champion_wr['win_count'].fillna(0)
+    df_champion_wr['win_ratio'] = df_champion_wr['win_count'] / df_champion_wr['usage_count']
          
+    return df_champion_wr
+
+def generate_champion_vs_df(df_split_dataset, df_training_labels):
+    modified_match_data = df_split_dataset.copy()
+    modified_match_data['match_id'] = range(1, len(modified_match_data) + 1)
+    modified_match_data['bResult'] = df_training_labels
+
+    blue_champs_df = modified_match_data[['blueTopChamp', 'blueMiddleChamp', 'blueJungleChamp', 'blueADCChamp', 'blueSupportChamp']]
+    red_champs_df =  modified_match_data[['redTopChamp', 'redMiddleChamp', 'redJungleChamp', 'redADCChamp', 'redSupportChamp']]
+
+    blue_champs = blue_champs_df.values.tolist()
+    red_champs = red_champs_df.values.tolist()
+
+    matchups = []
+    num_wins = []
+
+    for blue, red, blue_win in zip(blue_champs, red_champs, modified_match_data['bResult']):
+        for blue_player, red_player in product(blue, red):
+            matchups.append((blue_player, red_player))
+
+            # If blue team won, increment win for blue player, otherwise for red player
+            if blue_win == 1:
+                num_wins.append((blue_player, red_player, 1, 0))
+            else:
+                num_wins.append((blue_player, red_player, 0, 1))
+
+    # Create a DataFrame from the matchups and count occurrences
+    matchups_df = pd.DataFrame(matchups, columns=['champion', 'opponent'])
+    matchups_count_df = matchups_df.groupby(['champion', 'opponent']).size().reset_index(name='numPlayed')
+
+    # Create a DataFrame from the num_wins and calculate the number of wins
+    num_wins_df = pd.DataFrame(num_wins, columns=['champion', 'opponent', 'championWins', 'opponentWins'])
+    num_wins_summary = num_wins_df.groupby(['champion', 'opponent']).sum().reset_index()
+    num_wins_summary['numWins'] = num_wins_summary['championWins']
+
+    # Merge the matchup counts and win counts DataFrames
+    champion_vs_df = pd.merge(matchups_count_df, num_wins_summary[['champion', 'opponent', 'numWins']], 
+                        on=['champion', 'opponent'], how='left')
+
+    # Fill NaN values in numWins with 0
+    champion_vs_df['numWins'] = champion_vs_df['numWins'].fillna(0).astype(int)
+    champion_vs_df['win_ratio'] = champion_vs_df['numWins'] / champion_vs_df['numPlayed']
+
+    dt_champion_vs = champion_vs_df.set_index(['champion', 'opponent'])['win_ratio'].to_dict()
+
+    return dt_champion_vs
+
+def generate_team_wr(x_dataset, df_training_labels):
+    modified_match_data = x_dataset.copy()
+    modified_match_data['bResult'] = df_training_labels
+
+    modified_match_data['bNumWins'] = modified_match_data['bResult'].apply(lambda x: 1 if x == 1 else 0)
+    modified_match_data['rNumWins'] = modified_match_data['bResult'].apply(lambda x: 1 if x == 0 else 0)
+
+    blue_team_df = modified_match_data.groupby('blueTeamTag').agg({
+        'bResult': 'size',           # Total count of occurrences for each blue team.
+        'bNumWins': 'sum'           # Sum of 'numWins' to count where 'bResult' equals 1
+    }).reset_index()
+
+    red_team_df = modified_match_data.groupby('redTeamTag').agg({
+        'bResult': 'size',           # Total count of occurrences for each blue team.
+        'rNumWins': 'sum'           # Sum of 'numWins' to count where 'bResult' equals 1
+    }).reset_index()
+
+    blue_team_df.columns = ['blueTeamTag', 'matchesPlayed', 'numWins']
+    red_team_df.columns = ['redTeamTag', 'matchesPlayed', 'numWins']
+
+    blue_team_df['win_ratio'] = blue_team_df['numWins'] / blue_team_df['matchesPlayed']
+    red_team_df['win_ratio'] = red_team_df['numWins'] / red_team_df['matchesPlayed']
+
+    blue_team_dt = blue_team_df.set_index(['blueTeamTag'])['win_ratio'].to_dict()
+    red_team_dt = red_team_df.set_index(['redTeamTag'])['win_ratio'].to_dict()
+
+    return blue_team_dt, red_team_dt
+
 def process_feature1(x_dataset, df_player_data):
     for teamColor in TEAM_COLOR:
         for role in TEAM_ROLE:            
@@ -559,7 +705,56 @@ def process_feature4(x_dataset, dt_player_vs):
 def process_feature5(x_dataset):
     pass
 
-    # Function to compute the sum of pair win ratios for a given list of players
+
+def process_feature6(x_dataset, df_champion_wr):
+     #Convert the matches DataFrame to a long format
+    df_long = pd.melt(x_dataset.reset_index(), id_vars=['index'], 
+                    value_vars=['blueTopChamp', 'blueJungleChamp', 'blueMiddleChamp', 'blueADCChamp', 'blueSupportChamp',
+                                'redTopChamp', 'redJungleChamp', 'redMiddleChamp', 'redADCChamp', 'redSupportChamp'],
+                    var_name='team_role', value_name='champion')
+
+    df_long['position'] = df_long['team_role'].str.replace('red|blue', '', regex=True).replace('Champ', '', regex=True)
+    df_merged = df_long.merge(df_champion_wr, how='left', on=['champion', 'position'])
+    df_result = df_merged.pivot(index='index', columns='team_role', values='win_ratio')
+
+    player_combos = list(combinations(TEAM_ROLE, 2))
+    output_df = x_dataset.copy()
+
+    for teamColor in ['red', 'blue']:
+        team_initial = 'b' if teamColor == 'blue' else 'r'
+        outputLabel = f"{team_initial}CoopChampion"
+        output_df[outputLabel] = 0.0
+
+        for pair in player_combos:
+            combinedLabel_1 = f"{teamColor}{pair[0]}Champ"
+            combinedLabel_2 = f"{teamColor}{pair[1]}Champ"
+            
+            output_df[outputLabel] += df_result[combinedLabel_1] + df_result[combinedLabel_2]
+
+    return output_df
+
+def process_feature7(x_dataset, dt_champion_pair_data):
+    modified_match_data = x_dataset.copy()
+    modified_match_data['match_id'] = range(1, len(modified_match_data) + 1)
+
+    # Apply the function to compute the sum of win ratios for blue and red teams
+    modified_match_data['vsChampion'] = modified_match_data.apply(
+        lambda row: compute_sum_pair_win_ratios([row['blueTopChamp'], row['blueJungleChamp'], row['blueMiddleChamp'] , 
+                                                 row['blueADCChamp'], row['blueSupportChamp']], 
+                                                 dt_champion_pair_data), 
+                                                 axis=1)
+
+    return modified_match_data
+
+def process_feature8(x_dataset, dt_blue_team_wr, dt_red_team_wr):
+    modified_match_data = x_dataset.copy()
+
+    modified_match_data['bTeamColor'] = modified_match_data['blueTeamTag'].map(dt_blue_team_wr)
+    modified_match_data['rTeamColor'] = modified_match_data['redTeamTag'].map(dt_red_team_wr)
+
+    return modified_match_data
+
+# Function to compute the sum of pair win ratios for a given list of players
 def compute_sum_pair_win_ratios(players, pair_dt):
     pairs = list(combinations(sorted(set(players)), 2))
     return sum(pair_dt.get(tuple(sorted(set(pair))), 0) for pair in pairs)
