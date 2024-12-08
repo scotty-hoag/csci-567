@@ -5,7 +5,7 @@ import tensorflow as tf
 
 from sklearn.datasets import make_classification
 from sklearn.model_selection import cross_val_score, RepeatedKFold
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from sklearn.ensemble import StackingClassifier #For XGB implementation
 from scipy.stats import zscore
 
@@ -16,6 +16,8 @@ from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
 import load_data
+import neuralnetwork
+import sklearn_bayes
 
 class xgbStack:
     def __init__(self, hpNaiveBayes=None, hpNeuralNetwork=None, hpXgb=None):
@@ -108,33 +110,37 @@ class xgbStack:
     def test_perform_cross_validation(self, pipeline, x_training, y_training):
 
         #The default parameters in the paper mention n_splits=10, n_repeats=5, but this configuration can take a long time to process.
-        repeated_kfold = RepeatedKFold(n_splits=10, n_repeats=1, random_state=42)
-        scores = cross_val_score(pipeline, x_training, y_training, cv=repeated_kfold)
+        repeated_kfold = RepeatedKFold(n_splits=10, n_repeats=2, random_state=42)
+
+        scores = cross_val_score(pipeline, x_training, y_training, n_jobs=1, cv=repeated_kfold, scoring="balanced_accuracy")
 
         print("Cross-validation scores:", scores)
         print("Mean cross-validation score:", scores.mean())
         print("Standard deviation of cross-validation scores:", scores.std())
 
-    def train_model(self):
+    def train_model(self):        
         load_data.generate_temp_csv_data()
 
-        match_df_training = self.import_data(True, bIsGeneratedSet=True, bGenerateOutputFile=False)
-        match_df_test = self.import_data(False, bIsGeneratedSet=True, bGenerateOutputFile=False)
+        match_df_training = self.import_data(True, bIsGeneratedSet=True, bGenerateOutputFile=True)
+        match_df_test = self.import_data(False, bIsGeneratedSet=True, bGenerateOutputFile=True)
 
         x_train, y_train = self.extract_labels(match_df_training)
         x_test, y_test = self.extract_labels(match_df_test)    
 
         #Placeholder implementation - should be replaced with model objects returned from respective base model .py files.
-        model_nb = GaussianNB()
-        model_nn = MLPClassifier(hidden_layer_sizes=(256,),  
-                        activation='tanh',          # Activation function for hidden layers
-                        learning_rate_init=3e-4,
-                        max_iter=500,
-                        batch_size=2275,
-                        alpha=0.0001,
-                        learning_rate='adaptive',
-                        beta_1=0.9,
-                        solver='adam')     
+        # model_nb = GaussianNB()
+        model_nb = sklearn_bayes.returnModel(x_train, x_test, y_train, y_test)
+        model_nn = neuralnetwork.get_lol_nnet_model(train_model=False, in_training_type=1, in_random_seed=42)
+        
+        # model_nn = MLPClassifier(hidden_layer_sizes=(256,),  
+        #                 activation='tanh',          # Activation function for hidden layers
+        #                 learning_rate_init=3e-4,
+        #                 max_iter=500,
+        #                 batch_size=2275,
+        #                 alpha=0.0001,
+        #                 learning_rate='adaptive',
+        #                 beta_1=0.9,
+        #                 solver='adam')     
 
         base_models = [
             ('naive_bayes', model_nb),
@@ -166,11 +172,11 @@ class xgbStack:
 
         self.test_perform_cross_validation(pipeline, x_train, y_train)
         
-        pipeline.fit(x_train, y_train)
+        # pipeline.fit(x_train, y_train)
         y_pred = pipeline.predict(x_test)
 
         # Evaluate the model
-        accuracy = accuracy_score(y_test, y_pred)
+        accuracy = balanced_accuracy_score(y_test, y_pred)
         print(f"Accuracy: {accuracy:.4f}")
 
     def train_model_df(self):
@@ -205,7 +211,7 @@ class xgbStack:
             booster='gbtree',
             n_estimators=14000,
             max_depth=2,
-            # learning_rate=1e-6, #Note that the paper mentions 1e-6, but this causes the model to underperform significantly.
+            learning_rate=1e-3, #Note that the paper mentions 1e-6, but this causes the model to underperform significantly.
             min_child_weight=1,
             gamma=0,
             subsample=0.15,

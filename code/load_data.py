@@ -324,19 +324,19 @@ def generate_playerData_df(df_split_dataset):
 
     return player_counts_vectorized
 
-def generate_player_vs_df(df_split_dataset):
-    df_team_1 = df_split_dataset
-    pass
+# def generate_player_vs_df(df_split_dataset):
+#     df_team_1 = df_split_dataset
+#     pass
 
-def process_feature1(x_dataset, df_player_data):
-    for teamColor in TEAM_COLOR:
-        for role in TEAM_ROLE:            
-            player_data_map = df_player_data.set_index('Player')[f"{role}_Win_Ratio"].to_dict()
+# def process_feature1(x_dataset, df_player_data):
+#     for teamColor in TEAM_COLOR:
+#         for role in TEAM_ROLE:            
+#             player_data_map = df_player_data.set_index('Player')[f"{role}_Win_Ratio"].to_dict()
             
-            labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
-            x_dataset[labelName] = x_dataset[f"{teamColor.lower()}{role}"].map(player_data_map)
+#             labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
+#             x_dataset[labelName] = x_dataset[f"{teamColor.lower()}{role}"].map(player_data_map)
 
-    return x_dataset
+#     return x_dataset
 
 def generate_temp_csv_data(train_test_split=0.9):
     tempTrain_dirName = "temp_train"
@@ -352,7 +352,7 @@ def generate_temp_csv_data(train_test_split=0.9):
     
     os.mkdir(f"feature_data\\{tempTest_dirName}")
 
-    makedata.make_fixed_split_match_data(feature_folder_train=tempTrain_dirName, feature_folder_test=tempTest_dirName, train_test_split=0.9)
+    makedata.make_fixed_split_match_data(feature_folder_train=tempTrain_dirName, feature_folder_test=tempTest_dirName, percent_for_training=0.9)
 
     for folder in [tempTrain_dirName, tempTest_dirName]:
         makedata.parse_match_info(folder, feature_folder_original_data="original")

@@ -3,6 +3,9 @@ import pandas as pd
 import matplotlib as plt
 from pathlib import Path
 
+from scikeras.wrappers import KerasClassifier
+
+
 import os; 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
@@ -87,7 +90,7 @@ def get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_PAPER, in_rand
         model.compile(
             loss="binary_crossentropy",
             optimizer=tf.keras.optimizers.RMSprop(learning_rate=optimizer_learning_rate, rho=gradient_decay_rho),
-            metrics=["accuracy"])
+            )
     else:
         model.compile(
             loss="binary_crossentropy",
@@ -95,7 +98,8 @@ def get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_PAPER, in_rand
             metrics=["accuracy"])
     
     if not train_model:
-        return model
+        newModel = KerasClassifier(model, verbose=0)
+        return newModel
 
     # Load the training data.
     train_path = Path(in_training_data_path)
