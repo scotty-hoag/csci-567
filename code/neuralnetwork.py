@@ -31,7 +31,15 @@ glob_testing_path_damita = "./damita/trial_test_data.csv"
 glob_testing_path_default = glob_testing_path_without_champions
 
 
-def get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_PAPER, in_random_seed=42, in_training_data_path=glob_training_path_default, in_testing_data_path=glob_testing_path_default, print_debug=False, data_type=None):
+def get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_PAPER, in_random_seed=42, in_training_data_path=glob_training_path_default, in_testing_data_path=glob_testing_path_default, print_debug=False, data_type=None, use_data_type_to_pick_data_paths=True):
+
+    if use_data_type_to_pick_data_paths:
+        if data_type == DATA_PREPROCESSING_SCOTTY:
+            in_training_data_path = glob_training_path_default
+            in_testing_data_path = glob_testing_path_default
+        if data_type == DATA_PREPROCESSING_DAMITA:
+            in_training_data_path = glob_training_path_damita
+            in_testing_data_path = glob_testing_path_damita
 
     training_type = in_training_type
     op_type = OP_RMSPROP
@@ -153,8 +161,8 @@ if __name__ == "__main__":
             test_path = args[i]
         if (args[i] == "-damita"):
             data_type = DATA_PREPROCESSING_DAMITA
-            train_path = glob_training_path_damita
-            test_path = glob_testing_path_damita
+            #train_path = glob_training_path_damita
+            #test_path = glob_testing_path_damita
 
 
     get_lol_nnet_model(train_model=True, in_training_type=HPARAMS_PAPER, in_random_seed=42, in_training_data_path=train_path, in_testing_data_path=test_path, print_debug=True, data_type=data_type)
