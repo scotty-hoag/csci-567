@@ -255,114 +255,145 @@ def load_data_from_csv(bIsTrainingSet, bIsGeneratedSet=True, bGenerateOutputFile
 
     return modified_match_df
 
-def load_matchdata_into_df(dirMatchData):
-    match_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"feature_data\\{dirMatchData}\\match_info.csv")
+def load_matchdata_into_df(dirMatchData, inputFileName="match_info.csv", test_split=0.1, bSeparateSideWr=False):
+    match_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f"feature_data\\{dirMatchData}\\{inputFileName}")
     match_data = pd.read_csv(match_data_path, usecols=INPUT_COLS_MATCHDATA)
+
+    match_data.dropna(inplace=True)
+
+    #Remove rows containing 'unknown' player if using newer datasets
+    value_to_drop = 'unknown player'
+    match_data = match_data[~match_data.isin([value_to_drop]).any(axis=1)]
 
     #Extract the label from the match_data dataframe
     full_df = match_data.drop(columns='bResult')
     y_data_full_df = match_data['bResult']
 
-    x_train, x_test, y_train, y_test = train_test_split(full_df, y_data_full_df, test_size=0.1, stratify=y_data_full_df, random_state=42)
+    x_train, x_test, y_train, y_test = train_test_split(full_df, y_data_full_df, test_size=test_split, stratify=y_data_full_df, random_state=42)
 
-    x_train_player_data = generate_playerData_df(x_train)
-    x_test_player_data = generate_playerData_df(x_test)
+    x_train_player_data = generate_playerData_df(x_train, y_train)
+    x_test_player_data = generate_playerData_df(x_test, y_test)
+    x_full_player_data = generate_playerData_df(full_df, y_data_full_df)
 
     # x_train_player_vs_data = generate_playerData_df(x_train)
 
     x_train_player_champion_winRate = generate_player_champion_winRate(x_train, y_train)
     x_test_player_champion_winRate = generate_player_champion_winRate(x_test, y_test)
+    x_full_player_champion_winRate = generate_player_champion_winRate(full_df, y_data_full_df)
 
     dt_train_player_coop_winRate = generate_player_coop_df(x_train, y_train)
     dt_test_player_coop_winRate = generate_player_coop_df(x_test, y_test)
+    dt_full_player_coop_winRate = generate_player_coop_df(full_df, y_data_full_df)
 
     dt_train_player_vs = generate_player_vs_df(x_train, y_train)
     dt_test_player_vs = generate_player_vs_df(x_test, y_test)
+    dt_full_player_vs = generate_player_vs_df(full_df, y_data_full_df)
 
     dt_train_playerChampion_vs = generate_player_with_champion_wr_df(x_train, y_train)
     dt_test_playerChampion_vs = generate_player_with_champion_wr_df(x_test, y_test)
+    dt_full_playerChampion_vs = generate_player_with_champion_wr_df(full_df, y_data_full_df)
 
     dt_train_champion_vs = generate_champion_vs_df(x_train, y_train)
     dt_test_champion_vs = generate_champion_vs_df(x_test, y_test)
-
+    dt_full_champion_vs = generate_champion_vs_df(full_df, y_data_full_df)
+    
     df_train_blue_team_wr, df_train_red_team_wr = generate_team_wr(x_train, y_train)
     df_test_blue_team_wr, df_test_red_team_wr = generate_team_wr(x_test, y_test)
+    df_full_blue_team_wr, df_full_red_team_wr = generate_team_wr(full_df, y_data_full_df)
 
     if 'rResult' in x_train.columns:
         x_train.drop(columns='rResult', inplace=True)
 
     if 'rResult' in x_test.columns:        
         x_test.drop(columns='rResult', inplace=True)
+
+    if 'rResult' in full_df.columns:        
+        full_df.drop(columns='rResult', inplace=True)
     
-    x_train = process_feature1(x_train, x_train_player_data)
-    x_test = process_feature1(x_test, x_test_player_data)
+    x_combined = full_df
+
+    x_train = process_feature1(x_train, x_train_player_data, bSeparateSideWr)
+    x_test = process_feature1(x_test, x_test_player_data, bSeparateSideWr)
+    x_combined = process_feature1(x_combined, x_full_player_data, bSeparateSideWr)
 
     x_train = process_feature2(x_train, x_train_player_champion_winRate)
     x_test = process_feature2(x_test, x_test_player_champion_winRate)
+    x_combined = process_feature2(x_combined, x_full_player_champion_winRate)
 
     x_train = process_feature3(x_train, dt_train_player_coop_winRate)
     x_test = process_feature3(x_test, dt_test_player_coop_winRate)
+    x_combined = process_feature3(x_combined, dt_full_player_coop_winRate)
 
     x_train = process_feature4(x_train, dt_train_player_vs)
     x_test = process_feature4(x_test, dt_test_player_vs)
+    x_combined = process_feature4(x_combined, dt_full_player_vs)
 
     # x_train['btPlayerChampion'] = process_feature2_test(x_train, x_train_player_champion_winRate, 'blueTop', 'blueTopChamp')
     
     x_train = process_feature6(x_train, dt_train_playerChampion_vs)
     x_test = process_feature6(x_test, dt_test_playerChampion_vs)
+    x_combined = process_feature6(x_combined, dt_full_playerChampion_vs)
 
     x_train = process_feature7(x_train, dt_train_champion_vs)
     x_test = process_feature7(x_test, dt_test_champion_vs)
+    x_combined = process_feature7(x_combined, dt_full_champion_vs)
 
     x_train = process_feature8(x_train, df_train_blue_team_wr, df_train_red_team_wr)
     x_test = process_feature8(x_test, df_test_blue_team_wr, df_test_red_team_wr)
+    x_combined = process_feature8(x_combined, df_full_blue_team_wr, df_full_red_team_wr)
 
     x_train.drop(columns=DROPCOLS, inplace=True)
     x_test.drop(columns=DROPCOLS, inplace=True)
+    x_combined.drop(columns=DROPCOLS, inplace=True)
 
-    x_combined = pd.concat([x_train, x_test])
+    # x_combined = pd.concat([x_train, x_test])
     
     return x_train, x_test, y_train, y_test, x_combined, y_data_full_df
 
-def generate_playerData_df(df_split_dataset):
+def generate_playerData_df(df_split_dataset, df_split_labels):
+    base_dataset = df_split_dataset.copy()
+    base_dataset['bResult'] = df_split_labels
+
     role_columns = []
     for team in TEAM_COLOR:
         for role in TEAM_ROLE:
             role_columns.append(f"{team.lower()}{role}")
 
-    players_df = df_split_dataset.melt(value_vars=role_columns, value_name='Player', var_name='Role') 
+    players_df = base_dataset.melt(value_vars=role_columns, value_name='Player', var_name='Role') 
     player_counts_vectorized = players_df['Player'].value_counts().reset_index()
     player_counts_vectorized.columns = ['Player', 'Plays']
-
-    #Total wins
-    blue_wins = df_split_dataset[df_split_dataset['rResult'] == 0][role_columns[:5]].melt(value_name='Player').value_counts().reset_index(name='Win_Count').fillna(0)
-    red_wins = df_split_dataset[df_split_dataset['rResult'] == 1][role_columns[5:]].melt(value_name='Player').value_counts().reset_index(name='Win_Count').fillna(0)
-    win_counts_vectorized = pd.concat([blue_wins, red_wins]).groupby('Player').sum().reset_index()
-    win_counts_vectorized.drop(columns='variable', inplace=True)
-    player_counts_vectorized["Win_Count"] = win_counts_vectorized["Win_Count"]
-    player_counts_vectorized["Win_Count"] = player_counts_vectorized["Win_Count"].fillna(0)
+    playerData_Df = player_counts_vectorized
 
     #Create player_data dataframe.
     for role in TEAM_ROLE:
-        num_plays = df_split_dataset[[f"blue{role}", f"red{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"{role}_Plays")
-        num_plays = num_plays.groupby('Player').sum().reset_index()
-        num_plays.drop(columns='variable', inplace=True)
-        
-        blue_wins = df_split_dataset[df_split_dataset['rResult'] == 0][[f"blue{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"{role}_Win_Count").fillna(0)
-        red_wins = df_split_dataset[df_split_dataset['rResult'] == 1][[f"red{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"{role}_Win_Count").fillna(0)
-        
-        win_count_vectorized = pd.concat([blue_wins, red_wins]).groupby('Player').sum().reset_index()
-        win_count_vectorized.drop(columns='variable', inplace=True)
-        
-        merge_df = num_plays.merge(win_count_vectorized, on='Player', how='left').fillna(0)
-        merge_df[f"{role}_Win_Ratio"] = ((merge_df[f"{role}_Win_Count"]) / merge_df[f"{role}_Plays"].astype(float)).fillna(0.5)
+        num_blue_plays = base_dataset[[f"blue{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"blue{role}_Plays")
+        num_blue_plays = num_blue_plays.groupby('Player').sum().reset_index()
+        num_blue_plays.drop(columns='variable', inplace=True)
 
-        player_counts_vectorized = player_counts_vectorized.merge(merge_df, on='Player', how='left')
-        player_counts_vectorized[f"{role}_Win_Count"] = player_counts_vectorized[f"{role}_Win_Count"].fillna(0)
-        player_counts_vectorized[f"{role}_Plays"] = player_counts_vectorized[f"{role}_Plays"].fillna(0)
-        player_counts_vectorized[f"{role}_Win_Ratio"] = player_counts_vectorized[f"{role}_Win_Ratio"].fillna(0.5)
+        num_red_plays = base_dataset[[f"red{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"red{role}_Plays")
+        num_red_plays = num_red_plays.groupby('Player').sum().reset_index()
+        num_red_plays.drop(columns='variable', inplace=True)      
 
-    return player_counts_vectorized
+        playerData_Df = playerData_Df.merge(num_blue_plays, how='left', on='Player').fillna(0)
+        playerData_Df = playerData_Df.merge(num_red_plays, how='left', on='Player').fillna(0)
+        
+        blue_wins = base_dataset[base_dataset['bResult'] == 1][[f"blue{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"blue{role}_Win_Count").fillna(0)
+        red_wins = base_dataset[base_dataset['bResult'] == 0][[f"red{role}"]].melt(value_name='Player').value_counts().reset_index(name=f"red{role}_Win_Count").fillna(0)
+        blue_wins.drop(columns='variable', inplace=True) 
+        red_wins.drop(columns='variable', inplace=True) 
+
+        playerData_Df = playerData_Df.merge(blue_wins, how='left', on='Player').fillna(0)
+        playerData_Df = playerData_Df.merge(red_wins, how='left', on='Player').fillna(0)
+
+        playerData_Df[f"blue{role}_Win_Ratio"] = (playerData_Df[f"blue{role}_Win_Count"]/ playerData_Df[f"blue{role}_Plays"]).fillna(0.5)
+        playerData_Df[f"red{role}_Win_Ratio"] = (playerData_Df[f"red{role}_Win_Count"]/ playerData_Df[f"red{role}_Plays"]).fillna(0.5)
+
+        #Sum of plays on both sides.
+        playerData_Df[f"{role}_Plays"] = playerData_Df[f"blue{role}_Plays"] + playerData_Df[f"red{role}_Plays"]
+        playerData_Df[f"{role}_Wins"] = playerData_Df[f"blue{role}_Win_Count"] + playerData_Df[f"red{role}_Win_Count"]
+        playerData_Df[f"{role}_Win_Ratio"] = (playerData_Df[f"{role}_Wins"] / playerData_Df[f"{role}_Plays"]).fillna(0.5)
+
+    return playerData_Df
 
 def generate_player_champion_winRate(df_split_dataset, df_training_labels):
     """
@@ -650,11 +681,12 @@ def generate_team_wr(x_dataset, df_training_labels):
 
     return blue_team_dt, red_team_dt
 
-def process_feature1(x_dataset, df_player_data):
+def process_feature1(x_dataset, df_player_data, bSeparateWr=False):
     for teamColor in TEAM_COLOR:
-        for role in TEAM_ROLE:            
-            player_data_map = df_player_data.set_index('Player')[f"{role}_Win_Ratio"].to_dict()
-            
+        for role in TEAM_ROLE:      
+            wrColumn = f"{teamColor.lower()}{role}_Win_Ratio" if bSeparateWr else f"{role}_Win_Ratio"
+
+            player_data_map = df_player_data.set_index('Player')[wrColumn].to_dict()
             labelName = WIN_RATE_PLAYER_ROLE_REPLACE_COLS[f"{teamColor.lower()}{role}"]
             x_dataset[labelName] = x_dataset[f"{teamColor.lower()}{role}"].map(player_data_map)
 
@@ -812,9 +844,12 @@ def generate_temp_csv_data():
 #Define main function to enable running file independently from other components.
 if __name__ == "__main__":
 
-    x_train, x_test, y_train, y_test, x_combined, y_data_full_df = load_matchdata_into_df("original")
+    x_train, x_test, y_train, y_test, x_combined, y_data_full_df = load_matchdata_into_df("new")
+    # load_data_from_csv(True, bIsGeneratedSet=False, bGenerateOutputFile=False, bIncludeChampionRole_Feature=False)
+    
 
-    # generate_temp_csv_data()
+    # makedata.parse_match_info("original", feature_folder_original_data="original")
+    # makedata.WritePlayerData("original")
 
     # makedata.make_fixed_split_match_data(feature_folder_train="temp_train", feature_folder_test="temp_test")
     pass
