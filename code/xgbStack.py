@@ -110,9 +110,9 @@ class xgbStack:
     def test_perform_cross_validation(self, pipeline, x_training, y_training):
 
         #The default parameters in the paper mention n_splits=10, n_repeats=5, but this configuration can take a long time to process.
-        repeated_kfold = RepeatedKFold(n_splits=10, n_repeats=2, random_state=42)
+        repeated_kfold = RepeatedKFold(n_splits=10, n_repeats=1, random_state=42)
 
-        scores = cross_val_score(pipeline, x_training, y_training, n_jobs=1, cv=repeated_kfold, scoring="balanced_accuracy")
+        scores = cross_val_score(pipeline, x_training, y_training, n_jobs=1, cv=repeated_kfold, scoring="accuracy")
 
         print("Cross-validation scores:", scores)
         print("Mean cross-validation score:", scores.mean())
@@ -176,7 +176,7 @@ class xgbStack:
         y_pred = pipeline.predict(x_test)
 
         # Evaluate the model
-        accuracy = balanced_accuracy_score(y_test, y_pred)
+        accuracy = accuracy_score(y_test, y_pred)
         print(f"Accuracy: {accuracy:.4f}")
 
     def train_model_df(self):
